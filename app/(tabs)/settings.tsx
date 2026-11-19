@@ -63,14 +63,22 @@ export default function SettingsScreen() {
       <TextInput value={settings.ownerName} onChangeText={(ownerName) => patchSettings({ ownerName })} style={input(theme)} />
 
       <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 26, marginTop: 18 }}>Book style</Text>
-      <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, marginBottom: 8 }}>This changes the whole book. A single page can still wear something else.</Text>
+      <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, marginBottom: 8 }}>This changes the whole book and its cover. A single page can still wear something else. Animated styles are Diary Plus.</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
         {THEMES.map((item) => {
           const selected = settings.themeId === item.id;
+          const locked = Boolean(item.premium) && !wallet.premium;
           return (
             <Pressable
               key={item.id}
-              onPress={() => patchSettings({ themeId: item.id as ThemeId })}
+              accessibilityLabel={`${item.name} book style`}
+              onPress={() => {
+                if (locked) {
+                  router.push('/paywall' as Href);
+                  return;
+                }
+                patchSettings({ themeId: item.id as ThemeId });
+              }}
               style={{
                 width: '47%',
                 backgroundColor: item.colors.paper,
@@ -78,11 +86,13 @@ export default function SettingsScreen() {
                 padding: 12,
                 borderWidth: selected ? 3 : 1,
                 borderColor: selected ? item.colors.accent : item.colors.paperEdge,
+                opacity: locked ? 0.72 : 1,
               }}
             >
               <Text style={{ fontSize: 20 }}>{item.emoji}</Text>
               <Text style={{ color: item.colors.paperInk, fontFamily: item.display, fontSize: 18 }}>{item.name}</Text>
               <Text style={{ color: item.colors.paperSoft, fontFamily: item.body, fontSize: 12 }}>{item.tagline}</Text>
+              {item.premium ? <Text style={{ color: item.colors.accent, fontFamily: item.body, fontSize: 12, marginTop: 4 }}>{item.motion && item.motion !== 'none' ? 'Animated · Plus' : 'Plus'}</Text> : null}
             </Pressable>
           );
         })}
@@ -107,8 +117,41 @@ export default function SettingsScreen() {
         ))}
       </View>
 
+      <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 26, marginTop: 18 }}>Sound</Text>
+      <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, marginBottom: 8 }}>
+        Pal squeaks and page turns stay on this device. The phone’s silent switch is respected.
+      </Text>
+      <View style={{ gap: 8 }}>
+        <Button label={settings.soundEnabled ? 'Sound is on' : 'Sound is off'} tone={settings.soundEnabled ? 'primary' : 'ghost'} onPress={() => patchSettings({ soundEnabled: !settings.soundEnabled })} />
+        <Button label={settings.buddySounds ? 'Pal sounds on' : 'Pal sounds off'} tone="ghost" onPress={() => patchSettings({ buddySounds: !settings.buddySounds })} />
+        <Button label={settings.pageSounds ? 'Page turns on' : 'Page turns off'} tone="ghost" onPress={() => patchSettings({ pageSounds: !settings.pageSounds })} />
+        <FieldLabel>Volume</FieldLabel>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {[
+            { value: 0, label: 'Off' },
+            { value: 0.35, label: 'Soft' },
+            { value: 0.7, label: 'Medium' },
+            { value: 1, label: 'Full' },
+          ].map((step) => {
+            const selected = settings.soundVolume === step.value;
+            return (
+              <Pressable key={step.label} onPress={() => patchSettings({ soundVolume: step.value })} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: selected ? theme.colors.accent : theme.colors.chip }}>
+                <Text style={{ color: selected ? theme.colors.onAccent : theme.colors.chipInk, fontFamily: theme.body }}>{step.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
       <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 26, marginTop: 18 }}>Lock</Text>
-      <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, marginBottom: 8 }}>A four-digit passcode. Face ID and fingerprint work in the phone app.</Text>
+      <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, marginBottom: 8 }}>A four-digit passcode. Face ID and fingerprint work in the phone app. On the web, the cover opens with the passcode, or with a tap if you have not set one.</Text>
+      <View style={{ marginBottom: 8 }}>
+        <Button
+          label={settings.lockOnOpen ? 'Lock diary on open' : 'Cover only, then it opens'}
+          tone={settings.lockOnOpen ? 'primary' : 'ghost'}
+          onPress={() => patchSettings({ lockOnOpen: !settings.lockOnOpen })}
+        />
+      </View>
       <View style={{ gap: 8 }}>
         <Button
           label={settings.lockEnabled ? 'Change passcode' : 'Set a passcode'}
@@ -130,7 +173,7 @@ export default function SettingsScreen() {
       </View>
 
       <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 26, marginTop: 18 }}>Diary Plus</Text>
-      <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>{wallet.premium ? 'Unlocked on this device (test purchase).' : 'Premium packs, Ember, and Lumi are locked. Purchases here are mock only.'}</Text>
+      <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>{wallet.premium ? 'Unlocked on this device (test purchase).' : 'Premium packs, Ember, Lumi, and the animated book styles are locked. Purchases here are mock only.'}</Text>
       <View style={{ marginTop: 8 }}>
         <Button label={wallet.premium ? 'See Diary Plus' : 'Open the paywall'} onPress={() => router.push('/paywall' as Href)} />
       </View>

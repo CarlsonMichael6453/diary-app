@@ -1,9 +1,11 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Ellipse, G, Line, Path, Polygon, Rect, Text as SvgText } from 'react-native-svg';
 
 import { getMood, type MoodId } from '../data/moods';
+import { playBuddySound } from '../services/sounds';
 import { useTheme } from '../theme/BookTheme';
+import { useReduceMotion } from '../theme/useReduceMotion';
 import {
   buddyLine,
   getBuddy,
@@ -492,6 +494,8 @@ export function BuddyView({
   showLine = false,
   outfits,
   layout = 'stack',
+  taps = false,
+  onPress,
   ...ctx
 }: BuddyContext & {
   buddyId: string;
@@ -499,12 +503,18 @@ export function BuddyView({
   showLine?: boolean;
   outfits: string[];
   layout?: 'stack' | 'row';
+  taps?: boolean;
+  onPress?: () => void;
 }) {
   const theme = useTheme();
+  const reduceMotion = useReduceMotion();
   const buddy = getBuddy(buddyId);
   const bob = useRef(new Animated.Value(0)).current;
+  const reaction = `${ctx.mood}|${ctx.celebrate ? 1 : 0}|${ctx.writing ? 1 : 0}|${ctx.finished ? 1 : 0}|${ctx.streak}`;
+  const skipReaction = useRef(true);
 
   useEffect(() => {
+    if (reduceMotion) return;
     const duration = buddyId === 'shelly' ? 2800 : 1500;
     const loop = Animated.loop(
       Animated.sequence([
@@ -514,7 +524,15 @@ export function BuddyView({
     );
     loop.start();
     return () => loop.stop();
-  }, [bob, buddyId]);
+  }, [bob, buddyId, reduceMotion]);
+
+  useEffect(() => {
+    if (skipReaction.current) {
+      skipReaction.current = false;
+      return;
+    }
+    playBuddySound(buddyId);
+  }, [reaction, buddyId]);
 
   if (!buddy) return null;
   const Draw = BUDDY_DRAW[buddy.id];
@@ -527,20 +545,37 @@ export function BuddyView({
         ? [{ translateX: bob.interpolate({ inputRange: [0, 1], outputRange: [-18, 18] }) }]
         : [{ translateY: bob.interpolate({ inputRange: [0, 1], outputRange: [0, buddy.id === 'ghosty' ? -3 : -7] }) }];
 
+  const art = (
+    <Animated.View style={{ transform }}>
+      <Svg width={size} height={size * (170 / 160)} viewBox="0 0 160 170">
+        <Outfits ids={outfits} anchors={buddy.anchors} behind />
+        {Draw ? <Draw {...drawProps} /> : <Circle cx={80} cy={90} r={30} fill={theme.colors.accent} />}
+        <Outfits ids={outfits} anchors={buddy.anchors} />
+      </Svg>
+    </Animated.View>
+  );
+
   return (
-    <View style={[styles.wrap, layout === 'row' && styles.row]} pointerEvents="none">
+    <View style={[styles.wrap, layout === 'row' && styles.row]} pointerEvents={taps ? 'box-none' : 'none'}>
       {line ? (
         <View style={[styles.bubble, { backgroundColor: theme.colors.paper, borderColor: theme.colors.paperEdge }]}>
           <Text style={{ color: theme.colors.paperInk, fontFamily: theme.script, fontSize: 16, lineHeight: 18 }}>{line}</Text>
         </View>
       ) : null}
-      <Animated.View style={{ transform }}>
-        <Svg width={size} height={size * (170 / 160)} viewBox="0 0 160 170">
-          <Outfits ids={outfits} anchors={buddy.anchors} behind />
-          {Draw ? <Draw {...drawProps} /> : <Circle cx={80} cy={90} r={30} fill={theme.colors.accent} />}
-          <Outfits ids={outfits} anchors={buddy.anchors} />
-        </Svg>
-      </Animated.View>
+      {taps ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${buddy.name}, play sound`}
+          onPress={() => {
+            playBuddySound(buddy.id);
+            onPress?.();
+          }}
+        >
+          {art}
+        </Pressable>
+      ) : (
+        art
+      )}
     </View>
   );
 }

@@ -88,6 +88,11 @@ export function defaultSettings(): Settings {
     buddyId: 'mochi',
     outfitIds: ['ribbon'],
     dismissedNudgeDate: null,
+    soundEnabled: true,
+    buddySounds: true,
+    pageSounds: true,
+    soundVolume: 0.7,
+    lockOnOpen: true,
   };
 }
 
@@ -291,6 +296,15 @@ export const useDiary = create<DiaryStore>()(
       storage: createJSONStorage(() => AsyncStorage),
       version: 1,
       partialize: (state) => ({ settings: state.settings, entries: state.entries, wallet: state.wallet }),
+      merge: (persisted, current) => {
+        const saved = (persisted ?? {}) as Partial<DiaryData>;
+        return {
+          ...current,
+          settings: { ...defaultSettings(), ...saved.settings },
+          entries: saved.entries ?? current.entries,
+          wallet: { ...defaultWallet(), ...saved.wallet },
+        };
+      },
     },
   ),
 );

@@ -15,8 +15,10 @@ import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { LockOverlay } from '@/src/components/LockScreen';
+import { WelcomeOverlay } from '@/src/components/WelcomeOverlay';
 import { SoundRoutes } from '@/src/components/SoundRoutes';
-import { useHydrated } from '@/src/store/useDiary';
+import { setVaultEncryption } from '@/src/services/vault';
+import { useDiary, useHydrated } from '@/src/store/useDiary';
 import { BookThemeProvider } from '@/src/theme/BookTheme';
 
 export { ErrorBoundary } from 'expo-router';
@@ -25,6 +27,10 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const hydrated = useHydrated();
+  const encryptAtRest = useDiary((state) => state.settings.encryptAtRest);
+  useEffect(() => {
+    if (hydrated) setVaultEncryption(encryptAtRest);
+  }, [hydrated, encryptAtRest]);
   const [loaded, error] = useFonts({
     Nunito_400Regular,
     Nunito_600SemiBold,
@@ -65,6 +71,7 @@ export default function RootLayout() {
         </Stack>
         <SoundRoutes />
         <LockOverlay />
+        <WelcomeOverlay />
       </BookThemeProvider>
     </SafeAreaProvider>
   );

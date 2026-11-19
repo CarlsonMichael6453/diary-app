@@ -109,4 +109,6 @@ export type PackDef = {
   blurb: string;
   premium: boolean;
   swatch: string;
+  emoji?: string;
+  coinPrice?: number;
 };

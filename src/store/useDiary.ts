@@ -1,7 +1,8 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+
+import { vaultStorage } from '../services/vault';
 
 import { canEquipOutfit, getOutfit } from '../buddies/catalog';
 import { addDays, todayKey } from '../logic/dates';
@@ -11,7 +12,8 @@ import { loginProgress } from '../logic/streak';
 import { writingStreak } from '../logic/streak';
 import type { DiaryEntry, Settings, Snapshot, Wallet } from '../models/types';
 import { getProduct } from '../services/purchases';
-import { STICKERS, getSticker } from '../stickers/catalog';
+import { packOffer } from '../logic/packs';
+import { STICKERS, getPack, getSticker, stickersInPack } from '../stickers/catalog';
 import type { ThemeId } from '../theme/themes';
 
 export type DiaryData = {
@@ -93,6 +95,20 @@ export function defaultSettings(): Settings {
     pageSounds: true,
     soundVolume: 0.7,
     lockOnOpen: true,
+    books: [{ id: 'daily', title: 'Daily', themeId: 'cutesy' }],
+    activeBookId: 'daily',
+    lastBackupAt: null,
+    backupReminderDays: 14,
+    encryptAtRest: false,
+    locationOnEntry: false,
+    weatherOnEntry: false,
+    healthCorrelation: false,
+    palNotifications: true,
+    quietStart: 22,
+    quietEnd: 7,
+    lastSayingId: null,
+    seenWelcome: false,
+    shakeToOpen: true,
   };
 }
 
@@ -100,6 +116,7 @@ function defaultWallet(): Wallet {
   return {
     coins: 60,
     ownedStickerIds: STICKERS.filter((sticker) => sticker.unlock === 'free').map((sticker) => sticker.id),
+    ownedPackIds: ['spark', 'desk'],
     ownedOutfitIds: ['ribbon'],
     premium: false,
     loginStreak: 0,
@@ -124,6 +141,7 @@ type DiaryStore = DiaryData & {
   setBuddy: (buddyId: string) => void;
   toggleOutfit: (outfitId: string) => Result;
   buySticker: (stickerId: string) => Result;
+  buyPack: (packId: string) => Result;
   buyOutfit: (outfitId: string) => Result;
   grantReward: (reward: ResolvedReward, game?: 'memory' | 'catch') => void;
   claimLogin: () => Result;
@@ -135,12 +153,15 @@ type DiaryStore = DiaryData & {
   importSnapshot: (raw: unknown) => Result;
   resetBook: () => void;
   snapshot: () => Snapshot;
+  setActiveBook: (bookId: string) => void;
+  addBook: (title: string) => void;
+  markBackup: (iso: string) => void;
 };
 
 function asSnapshot(value: unknown): Snapshot | null {
   if (!value || typeof value !== 'object') return null;
   const record = value as Snapshot;
-  if (record.version !== 1 || !record.settings || !record.wallet || !Array.isArray(record.entries)) return null;
+  if ((record.version !== 1 && record.version !== 2) || !record.settings || !record.wallet || !Array.isArray(record.entries)) return null;
   return record;
 }
 
@@ -198,6 +219,25 @@ export const useDiary = create<DiaryStore>()(
           },
         });
         return { ok: true, message: `${sticker.name} is yours.` };
+      },
+      buyPack: (packId) => {
+        const pack = getPack(packId);
+        const wallet = get().wallet;
+        if (!pack) return { ok: false, message: 'That pack is not in the shop.' };
+        const offer = packOffer(pack);
+        if (offer.kind === 'premium' && !wallet.premium) return { ok: false, message: 'That pack is Diary Plus.' };
+        if (wallet.ownedPackIds.includes(pack.id) || offer.kind === 'free') return { ok: false, message: 'You already have this pack.' };
+        if (offer.kind === 'coins' && wallet.coins < offer.coins) return { ok: false, message: `You need ${offer.coins} coins.` };
+        const ids = stickersInPack(pack.id).map((sticker) => sticker.id);
+        set({
+          wallet: {
+            ...wallet,
+            coins: offer.kind === 'coins' ? wallet.coins - offer.coins : wallet.coins,
+            ownedPackIds: [...wallet.ownedPackIds, pack.id],
+            ownedStickerIds: Array.from(new Set([...wallet.ownedStickerIds, ...ids])),
+          },
+        });
+        return { ok: true, message: `${pack.name} is in the sticker book.` };
       },
       buyOutfit: (outfitId) => {
         const outfit = getOutfit(outfitId);
@@ -279,21 +319,39 @@ export const useDiary = create<DiaryStore>()(
         const snapshot = asSnapshot(raw);
         if (!snapshot) return { ok: false, message: 'That file is not a Diary App backup.' };
         set({
-          settings: { ...defaultSettings(), ...snapshot.settings },
+          settings: {
+            ...defaultSettings(),
+            ...snapshot.settings,
+            books: snapshot.books ?? snapshot.settings.books ?? defaultSettings().books,
+          },
           entries: snapshot.entries,
           wallet: { ...defaultWallet(), ...snapshot.wallet },
         });
         return { ok: true, message: 'Backup restored on this device.' };
       },
       resetBook: () => set(initialData()),
+      setActiveBook: (bookId) =>
+        set((state) => {
+          const book = state.settings.books.find((item) => item.id === bookId);
+          if (!book) return state;
+          return { settings: { ...state.settings, activeBookId: book.id, themeId: book.themeId } };
+        }),
+      addBook: (title) =>
+        set((state) => {
+          const id = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `book-${Date.now()}`;
+          if (state.settings.books.some((book) => book.id === id)) return state;
+          const book = { id, title: title.trim() || 'New book', themeId: state.settings.themeId };
+          return { settings: { ...state.settings, books: [...state.settings.books, book], activeBookId: id } };
+        }),
+      markBackup: (iso) => set((state) => ({ settings: { ...state.settings, lastBackupAt: iso } })),
       snapshot: () => {
         const { settings, entries, wallet } = get();
-        return { version: 1, exportedAt: new Date().toISOString(), settings, entries, wallet };
+        return { version: 2, exportedAt: new Date().toISOString(), settings, entries, wallet, books: settings.books };
       },
     }),
     {
       name: 'diary-app-v1',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => vaultStorage),
       version: 1,
       partialize: (state) => ({ settings: state.settings, entries: state.entries, wallet: state.wallet }),
       merge: (persisted, current) => {

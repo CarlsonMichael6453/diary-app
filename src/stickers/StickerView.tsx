@@ -1,68 +1,63 @@
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import type { Rarity } from '../logic/access';
 import { getSticker } from './catalog';
 import { StickerSvg } from './StickerSvg';
 
-const RARITY_RING: Record<Rarity, string> = {
-  common: '#FFFFFF',
-  rare: '#6AA7E8',
-  epic: '#B07BE0',
+const RARITY_GLOW: Record<Rarity, string | null> = {
+  common: null,
+  rare: '#7EB6FF',
+  epic: '#C9A0FF',
   legendary: '#E2B23A',
+};
+
+const RARITY_MARK: Record<Rarity, string> = {
+  common: '',
+  rare: 'R',
+  epic: 'E',
+  legendary: 'L',
 };
 
 export function StickerView({
   stickerId,
   size = 72,
-  framed = true,
+  selected = false,
 }: {
   stickerId: string;
   size?: number;
-  framed?: boolean;
+  selected?: boolean;
 }) {
   const sticker = getSticker(stickerId);
   if (!sticker) return null;
-  const ring = RARITY_RING[sticker.rarity];
-  if (!framed) {
-    return <StickerSvg art={sticker.art} colors={sticker.colors} size={size} />;
-  }
+  const glow = RARITY_GLOW[sticker.rarity];
   return (
-    <View
-      style={[
-        styles.card,
-        {
-          width: size,
-          height: size,
-          borderRadius: size * 0.22,
-          borderColor: ring,
-          borderWidth: sticker.rarity === 'common' ? 2 : 3,
-        },
-      ]}
-    >
-      <StickerSvg art={sticker.art} colors={sticker.colors} size={size * 0.78} />
-      {sticker.rarity === 'legendary' ? <View style={[styles.foil, { borderRadius: size * 0.22 }]} /> : null}
+    <View style={[styles.art, { width: size, height: size }, selected && styles.selected]}>
+      <View
+        style={
+          glow
+            ? {
+                shadowColor: glow,
+                shadowOpacity: 0.95,
+                shadowRadius: Math.max(6, size * 0.12),
+                shadowOffset: { width: 0, height: 0 },
+              }
+            : undefined
+        }
+      >
+        <StickerSvg art={sticker.art} colors={sticker.colors} size={size} />
+      </View>
+      {glow ? (
+        <View style={[styles.badge, { backgroundColor: glow }]}>
+          <Text style={styles.badgeText}>{RARITY_MARK[sticker.rarity]}</Text>
+        </View>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#FFFEFB',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#3A2A32',
-    shadowOpacity: 0.16,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
-  },
-  foil: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 236, 170, 0.9)',
-  },
+  art: { backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
+  selected: { borderRadius: 999, borderWidth: 1.5, borderColor: 'rgba(226,178,58,0.9)' },
+  badge: { position: 'absolute', top: 0, right: 0, minWidth: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2 },
+  badgeText: { color: '#1A1420', fontSize: 8, fontWeight: '700' },
 });

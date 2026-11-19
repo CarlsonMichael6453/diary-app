@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BuddyView } from '@/src/buddies/BuddyView';
 import { getBuddy } from '@/src/buddies/catalog';
+import { EntryExtras } from '@/src/components/EntryExtras';
 import { MoodPicker } from '@/src/components/MoodPicker';
 import { Paper } from '@/src/components/Paper';
 import { Screen } from '@/src/components/Screen';
@@ -37,10 +38,18 @@ type Draft = {
   stickers: StickerPlacement[];
   themeOverride: ThemeId | null;
   createdAt: number;
+  bookId?: string;
+  tags?: string[];
+  activities?: string[];
+  templateId?: string | null;
+  voiceNote?: string | null;
+  drawing?: string | null;
+  placeLabel?: string | null;
+  weather?: string | null;
 };
 
-function blank(date: string): Draft {
-  return { id: uid('page'), date, title: '', body: '', mood: 'calm', photos: [], stickers: [], themeOverride: null, createdAt: Date.now() };
+function blank(date: string, bookId: string): Draft {
+  return { id: uid('page'), date, title: '', body: '', mood: 'calm', photos: [], stickers: [], themeOverride: null, createdAt: Date.now(), bookId, tags: [], activities: [] };
 }
 
 function fromEntry(entry: DiaryEntry): Draft {
@@ -54,6 +63,14 @@ function fromEntry(entry: DiaryEntry): Draft {
     stickers: entry.stickers,
     themeOverride: entry.themeOverride,
     createdAt: entry.createdAt,
+    bookId: entry.bookId,
+    tags: entry.tags ?? [],
+    activities: entry.activities ?? [],
+    templateId: entry.templateId,
+    voiceNote: entry.voiceNote,
+    drawing: entry.drawing,
+    placeLabel: entry.placeLabel,
+    weather: entry.weather,
   };
 }
 
@@ -67,7 +84,7 @@ export default function EntryScreen() {
   useEffect(() => {
     if (draft) return;
     if (routeId !== 'new' && existing) setDraft(fromEntry(existing));
-    else setDraft(blank(typeof params.date === 'string' ? params.date : todayKey()));
+    else setDraft(blank(typeof params.date === 'string' ? params.date : todayKey(), useDiary.getState().settings.activeBookId));
   }, [draft, existing, params.date, routeId]);
 
   if (!draft) return null;
@@ -158,6 +175,7 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
               </View>
               <Text style={{ color: theme.colors.paperInk, fontFamily: theme.script, fontSize: 22, marginTop: 8 }}>{prompt}</Text>
               <MoodPicker value={draft.mood} onChange={(mood) => setDraft({ ...draft, mood })} />
+              <EntryExtras isNew={!saved} draft={draft} onChange={(patch) => setDraft({ ...draft, ...patch })} />
               <TextInput
                 value={draft.title}
                 onChangeText={(title) => setDraft({ ...draft, title })}

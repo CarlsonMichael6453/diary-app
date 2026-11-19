@@ -93,13 +93,8 @@ function PlacedSticker({
         zIndex: selected ? 8 : 2,
       }}
     >
-      <StickerView stickerId={placement.stickerId} size={size} />
-      {selected && decorate ? (
-        <>
-          <View pointerEvents="none" style={styles.ring} />
-          <View {...scalePan.panHandlers} style={styles.knob} />
-        </>
-      ) : null}
+      <StickerView stickerId={placement.stickerId} size={size} selected={selected && decorate} />
+      {selected && decorate ? <View {...scalePan.panHandlers} style={styles.knob} /> : null}
     </View>
   );
 }
@@ -140,7 +135,6 @@ export function StickerLayer({
 }
 
 const styles = StyleSheet.create({
-  ring: { position: 'absolute', top: -4, left: -4, right: -4, bottom: -4, borderWidth: 1.5, borderColor: '#E2B23A', borderRadius: 18, borderStyle: 'dashed' },
   knob: {
     position: 'absolute',
     right: -8,

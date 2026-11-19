@@ -79,6 +79,28 @@ Free styles are the original ten (Cutesy, Goth, Girlypop, Rainbow, Cottagecore, 
 
 Diary Plus adds the animated covers: Neon Glow, Galaxy Drift, Lava Lamp, Sparkle Rain, and Aurora. The motion is a few drifting shapes. Reduce Motion shows those styles without the movement. They use the same mock paywall as Ember and Lumi.
 
+## Books, backups, and stats
+
+The home screen can hold more than one book (Daily, Travel, Secrets, or whatever you name). Each book keeps the style you pick while it is open. Search can filter the open book by a tag.
+
+**On this day** shows a page from the same month and day in an earlier year and opens it.
+
+**Mood stats** is a year-in-pixels grid, mood counts, and “On good days you…” when a tag or activity keeps showing up on the kinder days.
+
+Settings → **Backup** shows the last backup time and reminds you when it has been quiet. You can save JSON (plain or passphrase-encrypted), CSV, or a readable PDF. On a phone the share sheet can put the file in iCloud Drive, Google Drive, or Files. On the web it downloads, and import reads a file you choose. Day One JSON, a Day One zip that contains JSON, Daylio CSV, and plain text can be imported. Photos and settings travel inside the Diary App JSON backup.
+
+**Encrypt entries on this device** scrambles the on-device copy with a key in the secure store. The website keeps that key in local storage, which is weaker than a phone. **Privacy** explains that diary words are not uploaded. Location and weather stay off until you turn them on, and then only coordinates go to Open-Meteo.
+
+Voice notes, a drawing layer, and page templates (gratitude, travel, therapy recap, dream log, daily check-in, goals, blank) live on the page. Pal reminders use a pool of more than 50 sayings, skip the one just used, and stay quiet during quiet hours (10pm–7am).
+
+Home-screen widgets (mood check-in, write today, streak, pal peek) and Apple Health / Health Connect need a development or EAS build. They do not run in Expo Go or on the website. Settings → **Widget preview** shows the cards. Stickers are the artwork only: no tile behind them. Rarity is a small glow and badge.
+
+The first launch says there is no AI and that the diary stays on the device, with a link to backups and PDF export. The same promise is on the Privacy screen. Send feedback still emails only what you type.
+
+**Sticker packs** in the store have a cover, a preview, and a mock price. Some cost coins and some are Diary Plus. Packs you own are grouped in the sticker album.
+
+**Shake to open** uses the phone accelerometer. On the web, wiggling the pointer over the cover does the same thing. If the diary is locked, that motion asks for Face ID or the passcode instead of skipping it. Tap to open stays available, and Reduce Motion or the Settings toggle turns the gesture off.
+
 ## Feedback
 
 **Send feedback** sits at the top of Settings and on the diary home. The form asks for a thumbs up or down, or 1 to 5 stars, a note, and an optional reply-to email. It adds the app version, the platform (web, iOS, or Android), and the OS version, then opens a `mailto:` link. There is no backend.

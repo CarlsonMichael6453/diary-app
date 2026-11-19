@@ -8,6 +8,8 @@ import { CoinPill } from '@/src/components/ui';
 import { getMood } from '@/src/data/moods';
 import { promptForDate } from '@/src/data/prompts';
 import { formatPretty, todayKey } from '@/src/logic/dates';
+import { backupIsDue, entryBookId, memoriesOnThisDay } from '@/src/logic/memories';
+import { pickSaying } from '@/src/logic/sayings';
 import { writingStreak } from '@/src/logic/streak';
 import { entriesOn, useDiary } from '@/src/store/useDiary';
 import { useTheme } from '@/src/theme/BookTheme';
@@ -18,12 +20,17 @@ export default function DiaryHome() {
   const settings = useDiary((state) => state.settings);
   const coins = useDiary((state) => state.wallet.coins);
   const dismissNudge = useDiary((state) => state.dismissNudge);
+  const setActiveBook = useDiary((state) => state.setActiveBook);
   const today = todayKey();
+  const visible = entries.filter((entry) => entryBookId(entry) === settings.activeBookId);
+  const memories = memoriesOnThisDay(visible, today);
+  const backupDue = backupIsDue(settings.lastBackupAt, today, settings.backupReminderDays);
+  const saying = pickSaying(settings.lastSayingId, settings.buddyId);
   const prompt = promptForDate(today);
-  const streak = writingStreak(entries.map((entry) => entry.date), today);
-  const todayEntries = entriesOn(entries, today);
+  const streak = writingStreak(visible.map((entry) => entry.date), today);
+  const todayEntries = entriesOn(visible, today);
   const wroteToday = todayEntries.length > 0;
-  const earlier = [...entries].filter((entry) => entry.date !== today).sort((a, b) => b.date.localeCompare(a.date) || b.updatedAt - a.updatedAt);
+  const earlier = [...visible].filter((entry) => entry.date !== today).sort((a, b) => b.date.localeCompare(a.date) || b.updatedAt - a.updatedAt);
   const showNudge = settings.reminderEnabled && !wroteToday && settings.dismissedNudgeDate !== today;
 
   return (
@@ -43,6 +50,22 @@ export default function DiaryHome() {
         </View>
         <CoinPill coins={coins} />
       </View>
+
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+        {settings.books.map((book) => (
+          <Pressable key={book.id} onPress={() => setActiveBook(book.id)} style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: book.id === settings.activeBookId ? theme.colors.accent : theme.colors.chip }}>
+            <Text style={{ color: book.id === settings.activeBookId ? theme.colors.onAccent : theme.colors.chipInk, fontFamily: theme.body }}>{book.title}</Text>
+          </Pressable>
+        ))}
+      </View>
+
+      {memories[0] ? (
+        <Pressable onPress={() => router.push(`/entry/${memories[0].entry.id}` as Href)} style={{ marginTop: 12, backgroundColor: theme.colors.card, borderRadius: theme.radius, padding: 14 }}>
+          <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 22 }}>On this day</Text>
+          <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>{memories[0].yearsAgo === 1 ? 'A year ago' : `${memories[0].yearsAgo} years ago`} · {memories[0].entry.title || 'Untitled page'}</Text>
+        </Pressable>
+      ) : null}
+      {backupDue ? <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, marginTop: 8 }}>No recent backup. Settings can save a JSON, CSV, or PDF copy.</Text> : null}
 
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>
         <View style={{ backgroundColor: theme.colors.chip, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 }}>
@@ -71,7 +94,7 @@ export default function DiaryHome() {
       {showNudge ? (
         <View style={{ marginTop: 12, backgroundColor: theme.colors.card, borderRadius: theme.radius, padding: 14, gap: 8 }}>
           <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 22 }}>A gentle nudge</Text>
-          <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>Today’s page is still blank. A few lines is enough.</Text>
+          <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>{settings.palNotifications ? saying.text : 'Today’s page is still blank. A few lines is enough.'}</Text>
           <View style={{ flexDirection: 'row', gap: 12 }}>
             <Pressable onPress={() => router.push(`/entry/new?date=${today}` as Href)}>
               <Text style={{ color: theme.colors.accent, fontFamily: theme.body }}>Write now</Text>

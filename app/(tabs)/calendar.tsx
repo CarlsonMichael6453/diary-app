@@ -7,6 +7,7 @@ import { Button } from '@/src/components/ui';
 import { getMood } from '@/src/data/moods';
 import { formatPretty, monthLabel, todayKey } from '@/src/logic/dates';
 import type { DiaryEntry } from '@/src/models/types';
+import { entryBookId } from '@/src/logic/memories';
 import { playPageTurn } from '@/src/services/sounds';
 import { entriesOn, useDiary } from '@/src/store/useDiary';
 import { useTheme } from '@/src/theme/BookTheme';
@@ -15,7 +16,9 @@ const WEEK = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 export default function CalendarScreen() {
   const theme = useTheme();
-  const entries = useDiary((state) => state.entries);
+  const allEntries = useDiary((state) => state.entries);
+  const activeBookId = useDiary((state) => state.settings.activeBookId);
+  const entries = allEntries.filter((entry) => entryBookId(entry) === activeBookId);
   const today = todayKey();
   const initial = new Date();
   const [cursor, setCursor] = useState({ year: initial.getFullYear(), month: initial.getMonth() });

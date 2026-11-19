@@ -5,7 +5,8 @@ import { Pressable, Text, View } from 'react-native';
 import { Screen } from '@/src/components/Screen';
 import { Button, CoinPill } from '@/src/components/ui';
 import { canUseItem, rarityLabel } from '@/src/logic/access';
-import { PACK_EMOJI, packIsOwned } from '@/src/logic/packs';
+import { PACK_EMOJI, packIsListed, packIsOwned } from '@/src/logic/packs';
+import { birthdayFrom, shopToday } from '@/src/logic/seasons';
 import { useDiary } from '@/src/store/useDiary';
 import { PACKS, stickersInPack } from '@/src/stickers/catalog';
 import { StickerView } from '@/src/stickers/StickerView';
@@ -14,10 +15,14 @@ import { useTheme } from '@/src/theme/BookTheme';
 export default function AlbumScreen() {
   const theme = useTheme();
   const wallet = useDiary((state) => state.wallet);
+  const settings = useDiary((state) => state.settings);
   const buySticker = useDiary((state) => state.buySticker);
-  const [packId, setPackId] = useState(PACKS[0].id);
+  const today = shopToday(settings.debugDate);
+  const birthday = birthdayFrom(settings.birthdayMonth, settings.birthdayDay);
+  const listed = PACKS.filter((item) => packIsListed(item, wallet.ownedPackIds, today, birthday));
+  const [packId, setPackId] = useState(listed[0]?.id ?? PACKS[0].id);
   const [note, setNote] = useState('');
-  const pack = PACKS.find((item) => item.id === packId) ?? PACKS[0];
+  const pack = listed.find((item) => item.id === packId) ?? listed[0] ?? PACKS[0];
 
   return (
     <Screen>
@@ -29,7 +34,7 @@ export default function AlbumScreen() {
       <Button label="Sticker pack store" onPress={() => router.push('/sticker-store' as Href)} />
       <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>{pack.blurb}</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginVertical: 12 }}>
-        {PACKS.map((item) => (
+        {listed.map((item) => (
           <Pressable key={item.id} onPress={() => setPackId(item.id)} style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: item.id === packId ? item.swatch : theme.colors.chip }}>
             <Text style={{ color: item.id === packId ? '#1A1420' : theme.colors.chipInk, fontFamily: theme.body, fontSize: 12 }}>{item.name}</Text>
           </Pressable>
@@ -60,7 +65,12 @@ export default function AlbumScreen() {
                   return;
                 }
                 if (sticker.unlock === 'coins') {
-                  setNote(buySticker(sticker.id).message ?? '');
+                  const result = buySticker(sticker.id);
+                  if (!result.ok && result.message?.includes('Diary Plus')) {
+                    router.push('/paywall' as Href);
+                    return;
+                  }
+                  setNote(result.message ?? '');
                   return;
                 }
                 router.push('/paywall' as Href);

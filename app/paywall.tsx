@@ -23,7 +23,7 @@ export default function PaywallScreen() {
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const provider = getPurchaseProvider();
-  const premiumPacks = PACKS.filter((pack) => pack.premium);
+  const premiumPacks = PACKS.filter((pack) => pack.premium && !pack.seasonal && !pack.hidden);
   const premiumBuddies = BUDDIES.filter((buddy) => buddy.premium);
 
   async function buy(productId: string) {
@@ -63,6 +63,7 @@ export default function PaywallScreen() {
       <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 26, marginTop: 8 }}>Animated styles</Text>
       <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>{THEMES.filter((item) => item.premium).map((item) => item.name).join(', ')}</Text>
       <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 26, marginTop: 8 }}>Packs</Text>
+      <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>Seasonal Plus packs show up in the shop during their holiday, then stay in your book.</Text>
       {premiumPacks.map((pack) => (
         <View key={pack.id} style={{ marginTop: 10 }}>
           <Text style={{ color: theme.colors.ink, fontFamily: theme.body }}>{pack.name}</Text>

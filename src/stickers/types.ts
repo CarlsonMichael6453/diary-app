@@ -111,4 +111,8 @@ export type PackDef = {
   swatch: string;
   emoji?: string;
   coinPrice?: number;
+  /** In the shop only around its holiday. Owned stickers stay. */
+  seasonal?: boolean;
+  /** Kept so older pages still render. Hidden from the shop. */
+  hidden?: boolean;
 };

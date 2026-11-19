@@ -1,4 +1,7 @@
-import type { PackDef } from '../stickers/types';
+import type { Birthday } from './seasons';
+import { isSeasonalPack, packOnSale, shopToday } from './seasons';
+import { STICKERS } from '../stickers/catalog';
+import type { PackDef, StickerDef } from '../stickers/types';
 
 export type PackOffer = { kind: 'free' | 'coins' | 'premium'; coins: number };
 
@@ -13,8 +16,25 @@ export function packIsOwned(pack: PackDef, ownedPackIds: string[], premium: bool
   const offer = packOffer(pack);
   if (offer.kind === 'free') return true;
   if (ownedPackIds.includes(pack.id)) return true;
-  if (offer.kind === 'premium' && premium) return true;
+  if (offer.kind === 'premium' && premium && !pack.seasonal) return true;
   return false;
+}
+
+/** Year-round packs, plus seasonal packs you own or that are in the shop today. */
+export function packIsListed(pack: PackDef, ownedPackIds: string[], today: string, birthday: Birthday | null): boolean {
+  if (ownedPackIds.includes(pack.id)) return true;
+  if (pack.hidden) return false;
+  if (!pack.seasonal) return true;
+  return packOnSale(pack.id, today, birthday);
+}
+
+/** Game and login rewards can earn a seasonal sticker only while its pack is in the shop. */
+export function earnableStickers(today: string, birthday: Birthday | null): StickerDef[] {
+  return STICKERS.filter((sticker) => !isSeasonalPack(sticker.packId) || packOnSale(sticker.packId, today, birthday));
+}
+
+export function rewardPoolFor(debugDate: string | null | undefined, birthday: Birthday | null, now = new Date()): StickerDef[] {
+  return earnableStickers(shopToday(debugDate, now), birthday);
 }
 
 export const PACK_EMOJI: Record<string, string> = {

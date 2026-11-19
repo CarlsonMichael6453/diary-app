@@ -1,7 +1,9 @@
 import { router, type Href } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { BuddyView } from '@/src/buddies/BuddyView';
+import { getBuddy } from '@/src/buddies/catalog';
 import { Paper } from '@/src/components/Paper';
 import { Screen } from '@/src/components/Screen';
 import { CoinPill } from '@/src/components/ui';
@@ -9,7 +11,10 @@ import { getMood } from '@/src/data/moods';
 import { promptForDate } from '@/src/data/prompts';
 import { formatPretty, todayKey } from '@/src/logic/dates';
 import { backupIsDue, entryBookId, memoriesOnThisDay } from '@/src/logic/memories';
-import { pickSaying } from '@/src/logic/sayings';
+import { birthdayFrom, seasonArrivals, shopToday } from '@/src/logic/seasons';
+import { inQuietHours, pickSaying } from '@/src/logic/sayings';
+import { pingPal } from '@/src/services/notifications';
+import { getPack } from '@/src/stickers/catalog';
 import { writingStreak } from '@/src/logic/streak';
 import { entriesOn, useDiary } from '@/src/store/useDiary';
 import { useTheme } from '@/src/theme/BookTheme';
@@ -20,8 +25,11 @@ export default function DiaryHome() {
   const settings = useDiary((state) => state.settings);
   const coins = useDiary((state) => state.wallet.coins);
   const dismissNudge = useDiary((state) => state.dismissNudge);
+  const patchSettings = useDiary((state) => state.patchSettings);
   const setActiveBook = useDiary((state) => state.setActiveBook);
+  const [seasonNote, setSeasonNote] = useState('');
   const today = todayKey();
+  const shop = shopToday(settings.debugDate);
   const visible = entries.filter((entry) => entryBookId(entry) === settings.activeBookId);
   const memories = memoriesOnThisDay(visible, today);
   const backupDue = backupIsDue(settings.lastBackupAt, today, settings.backupReminderDays);
@@ -32,6 +40,21 @@ export default function DiaryHome() {
   const wroteToday = todayEntries.length > 0;
   const earlier = [...visible].filter((entry) => entry.date !== today).sort((a, b) => b.date.localeCompare(a.date) || b.updatedAt - a.updatedAt);
   const showNudge = settings.reminderEnabled && !wroteToday && settings.dismissedNudgeDate !== today;
+
+  useEffect(() => {
+    if (!settings.seenWelcome || !settings.palNotifications) return;
+    if (inQuietHours(new Date().getHours(), settings.quietStart, settings.quietEnd)) return;
+    const arrivals = seasonArrivals(shop, birthdayFrom(settings.birthdayMonth, settings.birthdayDay), settings.seasonAnnounced ?? []);
+    if (arrivals.length === 0) return;
+    const buddy = getBuddy(settings.buddyId);
+    const names = arrivals.map((item) => getPack(item.packId)?.name).filter((name): name is string => Boolean(name));
+    const line = names.length === 1
+      ? `${buddy?.name ?? 'Your pal'} brought the ${names[0]} stickers.`
+      : `${buddy?.name ?? 'Your pal'} says ${names.length} seasonal packs are in the shop.`;
+    setSeasonNote(line);
+    patchSettings({ seasonAnnounced: [...(settings.seasonAnnounced ?? []), ...arrivals.map((item) => item.key)] });
+    void pingPal(buddy?.name ?? 'Your pal', line);
+  }, [settings.seenWelcome, settings.palNotifications, settings.quietStart, settings.quietEnd, settings.buddyId, settings.birthdayMonth, settings.birthdayDay, settings.seasonAnnounced, settings.debugDate, shop, patchSettings]);
 
   return (
     <Screen>
@@ -66,6 +89,12 @@ export default function DiaryHome() {
         </Pressable>
       ) : null}
       {backupDue ? <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, marginTop: 8 }}>No recent backup. Settings can save a JSON, CSV, or PDF copy.</Text> : null}
+      {seasonNote ? (
+        <Pressable onPress={() => router.push('/sticker-store' as Href)} style={{ marginTop: 12, backgroundColor: theme.colors.card, borderRadius: theme.radius, padding: 14 }}>
+          <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 22 }}>Seasonal stickers</Text>
+          <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>{seasonNote}</Text>
+        </Pressable>
+      ) : null}
 
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>
         <View style={{ backgroundColor: theme.colors.chip, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 }}>

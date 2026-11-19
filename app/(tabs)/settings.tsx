@@ -4,6 +4,7 @@ import { Platform, Pressable, Share, Text, TextInput, View } from 'react-native'
 
 import { getBuddy } from '@/src/buddies/catalog';
 import { LibraryPanel } from '@/src/components/LibraryPanel';
+import { SeasonSettings } from '@/src/components/SeasonSettings';
 import { PasscodePad } from '@/src/components/LockScreen';
 import { Screen } from '@/src/components/Screen';
 import { Button, Confirm, FieldLabel } from '@/src/components/ui';
@@ -189,6 +190,8 @@ export default function SettingsScreen() {
       <View style={{ marginTop: 8 }}>
         <Button label={wallet.premium ? 'See Diary Plus' : 'Open the paywall'} onPress={() => router.push('/paywall' as Href)} />
       </View>
+
+      <SeasonSettings />
 
       <LibraryPanel />
 

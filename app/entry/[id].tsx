@@ -15,6 +15,8 @@ import { Button, Confirm } from '@/src/components/ui';
 import { type MoodId } from '@/src/data/moods';
 import { promptForDate } from '@/src/data/prompts';
 import { canUseItem } from '@/src/logic/access';
+import { packIsListed } from '@/src/logic/packs';
+import { birthdayFrom, shopToday } from '@/src/logic/seasons';
 import { addDays, formatLong, todayKey } from '@/src/logic/dates';
 import { uid } from '@/src/logic/id';
 import { writingStreak } from '@/src/logic/streak';
@@ -115,6 +117,8 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
   const [showThemes, setShowThemes] = useState(false);
   const review = useReviewMoment();
   const prompt = promptForDate(draft.date);
+  const listedPacks = PACKS.filter((pack) => packIsListed(pack, wallet.ownedPackIds, shopToday(settings.debugDate), birthdayFrom(settings.birthdayMonth, settings.birthdayDay)));
+  const activePack = listedPacks.find((pack) => pack.id === packId) ?? listedPacks[0] ?? PACKS[0];
   const streak = writingStreak(entries.map((entry) => entry.date));
   const buddy = getBuddy(settings.buddyId);
   const perch = buddy?.perch ?? 'br';
@@ -290,25 +294,28 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
             <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, marginBottom: 6 }}>Drag a sticker. The gold dot resizes it.</Text>
           )}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-            {PACKS.map((pack) => (
-              <Pressable key={pack.id} onPress={() => setPackId(pack.id)} style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: packId === pack.id ? theme.colors.accent : theme.colors.chip }}>
-                <Text style={{ color: packId === pack.id ? theme.colors.onAccent : theme.colors.chipInk, fontFamily: theme.body, fontSize: 12 }}>{pack.name}</Text>
+            {listedPacks.map((pack) => (
+              <Pressable key={pack.id} onPress={() => setPackId(pack.id)} style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: activePack.id === pack.id ? theme.colors.accent : theme.colors.chip }}>
+                <Text style={{ color: activePack.id === pack.id ? theme.colors.onAccent : theme.colors.chipInk, fontFamily: theme.body, fontSize: 12 }}>{pack.name}</Text>
               </Pressable>
             ))}
           </ScrollView>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingTop: 8 }}>
-            {stickersInPack(packId).map((sticker) => {
-              const owned = canUseItem(sticker, { ownedIds: wallet.ownedStickerIds, premium: wallet.premium });
+            {stickersInPack(activePack.id).map((sticker) => {
+              const owned = canUseItem(sticker, { ownedIds: wallet.ownedStickerIds, premium: wallet.premium && !activePack.seasonal });
+              const plusPack = Boolean(activePack.premium) && !wallet.premium;
               return (
                 <Pressable
                   key={sticker.id}
                   onPress={() => {
                     if (!owned) {
-                      if (sticker.unlock === 'premium' || sticker.rarity === 'legendary' || sticker.rarity === 'epic') router.push('/paywall' as Href);
-                      else {
-                        const result = buySticker(sticker.id);
-                        setToast(result.message ?? '');
+                      if (plusPack || sticker.unlock === 'premium' || sticker.rarity === 'legendary') {
+                        router.push('/paywall' as Href);
+                        return;
                       }
+                      const result = buySticker(sticker.id);
+                      if (!result.ok && result.message?.includes('Diary Plus')) router.push('/paywall' as Href);
+                      else setToast(result.message ?? '');
                       return;
                     }
                     if (draft.stickers.length >= 24) {
@@ -330,7 +337,7 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
                   style={{ opacity: owned ? 1 : 0.45, alignItems: 'center', width: 74 }}
                 >
                   <StickerView stickerId={sticker.id} size={64} />
-                  <Text numberOfLines={1} style={{ color: theme.colors.inkSoft, fontSize: 10, fontFamily: theme.body }}>{owned ? sticker.name : sticker.unlock === 'coins' ? `${sticker.price}🪙` : 'Plus'}</Text>
+                  <Text numberOfLines={1} style={{ color: theme.colors.inkSoft, fontSize: 10, fontFamily: theme.body }}>{owned ? sticker.name : plusPack || sticker.unlock !== 'coins' ? 'Plus' : `${sticker.price}🪙`}</Text>
                 </Pressable>
               );
             })}

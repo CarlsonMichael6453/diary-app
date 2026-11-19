@@ -69,6 +69,11 @@ export type Settings = {
   lastSayingId: string | null;
   seenWelcome: boolean;
   shakeToOpen: boolean;
+  birthdayMonth: number | null;
+  birthdayDay: number | null;
+  /** YYYY-MM-DD shop preview. Diary pages keep the real date. */
+  debugDate: string | null;
+  seasonAnnounced: string[];
 };
 
 export type Wallet = {

@@ -7,12 +7,13 @@ import { vaultStorage } from '../services/vault';
 import { canEquipOutfit, getOutfit } from '../buddies/catalog';
 import { addDays, todayKey } from '../logic/dates';
 import { uid } from '../logic/id';
+import { packOffer, rewardPoolFor } from '../logic/packs';
 import { LOGIN_REWARDS, resolveReward, streakOutfitIds, writingBonus, type ResolvedReward } from '../logic/rewards';
+import { birthdayFrom, isSeasonalPack, packOnSale, shopToday } from '../logic/seasons';
 import { loginProgress } from '../logic/streak';
 import { writingStreak } from '../logic/streak';
 import type { DiaryEntry, Settings, Snapshot, Wallet } from '../models/types';
 import { getProduct } from '../services/purchases';
-import { packOffer } from '../logic/packs';
 import { STICKERS, getPack, getSticker, stickersInPack } from '../stickers/catalog';
 import type { ThemeId } from '../theme/themes';
 
@@ -109,6 +110,10 @@ export function defaultSettings(): Settings {
     lastSayingId: null,
     seenWelcome: false,
     shakeToOpen: true,
+    birthdayMonth: null,
+    birthdayDay: null,
+    debugDate: null,
+    seasonAnnounced: [],
   };
 }
 
@@ -208,8 +213,15 @@ export const useDiary = create<DiaryStore>()(
       buySticker: (stickerId) => {
         const sticker = getSticker(stickerId);
         const wallet = get().wallet;
+        const settings = get().settings;
         if (!sticker || sticker.unlock !== 'coins') return { ok: false, message: 'This one is not sold for coins.' };
         if (wallet.ownedStickerIds.includes(sticker.id)) return { ok: false, message: 'Already in the album.' };
+        const pack = getPack(sticker.packId);
+        if (pack?.premium && !wallet.premium && !wallet.ownedPackIds.includes(pack.id)) return { ok: false, message: 'That pack is Diary Plus.' };
+        if (isSeasonalPack(sticker.packId) && !wallet.ownedPackIds.includes(sticker.packId)) {
+          const birthday = birthdayFrom(settings.birthdayMonth, settings.birthdayDay);
+          if (!packOnSale(sticker.packId, shopToday(settings.debugDate), birthday)) return { ok: false, message: 'That pack is between seasons.' };
+        }
         if (wallet.coins < sticker.price) return { ok: false, message: `You need ${sticker.price} coins.` };
         set({
           wallet: {
@@ -223,7 +235,12 @@ export const useDiary = create<DiaryStore>()(
       buyPack: (packId) => {
         const pack = getPack(packId);
         const wallet = get().wallet;
+        const settings = get().settings;
         if (!pack) return { ok: false, message: 'That pack is not in the shop.' };
+        if (pack.seasonal) {
+          const birthday = birthdayFrom(settings.birthdayMonth, settings.birthdayDay);
+          if (!packOnSale(pack.id, shopToday(settings.debugDate), birthday)) return { ok: false, message: 'That pack is between seasons.' };
+        }
         const offer = packOffer(pack);
         if (offer.kind === 'premium' && !wallet.premium) return { ok: false, message: 'That pack is Diary Plus.' };
         if (wallet.ownedPackIds.includes(pack.id) || offer.kind === 'free') return { ok: false, message: 'You already have this pack.' };
@@ -276,10 +293,12 @@ export const useDiary = create<DiaryStore>()(
       claimLogin: () => {
         const today = todayKey();
         const wallet = get().wallet;
+        const settings = get().settings;
         const progress = loginProgress(wallet.lastLoginDate, wallet.loginStreak, today);
         if (progress.claimed) return { ok: false, message: 'Today’s visit gift is already open.' };
         const draft = LOGIN_REWARDS[progress.dayIndex];
-        const reward = resolveReward(draft, STICKERS, wallet.ownedStickerIds, wallet.ownedOutfitIds);
+        const birthday = birthdayFrom(settings.birthdayMonth, settings.birthdayDay);
+        const reward = resolveReward(draft, rewardPoolFor(settings.debugDate, birthday), wallet.ownedStickerIds, wallet.ownedOutfitIds);
         set({
           wallet: {
             ...wallet,

@@ -7,7 +7,9 @@ import { ReviewPrompt, useReviewMoment } from '@/src/components/ReviewPrompt';
 import { Screen } from '@/src/components/Screen';
 import { Button } from '@/src/components/ui';
 import { todayKey } from '@/src/logic/dates';
+import { rewardPoolFor } from '@/src/logic/packs';
 import { resolveReward, rewardForMemory, type ResolvedReward } from '@/src/logic/rewards';
+import { birthdayFrom } from '@/src/logic/seasons';
 import { useDiary } from '@/src/store/useDiary';
 import { STICKERS } from '@/src/stickers/catalog';
 import { StickerView } from '@/src/stickers/StickerView';
@@ -57,7 +59,9 @@ export default function MemoryScreen() {
     const rewardDraft = allowDrop
       ? draft
       : { ...draft, stickerRarity: undefined, outfitId: undefined, detail: 'Coins for this round. Sticker drops refresh tomorrow.' };
-    const resolved = resolveReward(rewardDraft, STICKERS, current.ownedStickerIds, current.ownedOutfitIds);
+    const settings = useDiary.getState().settings;
+    const pool = rewardPoolFor(settings.debugDate, birthdayFrom(settings.birthdayMonth, settings.birthdayDay));
+    const resolved = resolveReward(rewardDraft, pool, current.ownedStickerIds, current.ownedOutfitIds);
     grantReward(resolved, allowDrop ? 'memory' : undefined);
     setReward(resolved);
     void review.consider('game-won');

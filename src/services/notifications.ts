@@ -58,3 +58,19 @@ export async function syncReminder(
     return 'Reminders could not be scheduled on this device.';
   }
 }
+
+/** A one-off pal line. Web keeps this in the app. Native sends it only if permission is already granted. */
+export async function pingPal(title: string, body: string): Promise<void> {
+  if (Platform.OS === 'web') return;
+  try {
+    const Notifications = await import('expo-notifications');
+    const permission = await Notifications.getPermissionsAsync();
+    if (!permission.granted) return;
+    await Notifications.scheduleNotificationAsync({
+      content: { title, body },
+      trigger: null,
+    });
+  } catch {
+    // The in-app line still shows.
+  }
+}

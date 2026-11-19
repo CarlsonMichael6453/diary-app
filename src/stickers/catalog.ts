@@ -1,5 +1,6 @@
 import { coinPrice, type Rarity, type Unlock } from '../logic/access';
 import { slug } from '../logic/id';
+import { SEASONAL_PACKS, SEASONAL_STICKERS } from './seasonal';
 import type { ArtKey, PackDef, Palette, StickerDef } from './types';
 
 const P = {
@@ -64,9 +65,10 @@ export const PACKS: PackDef[] = [
   { id: 'food', name: 'Food', blurb: 'Tea, berries, and Saturday bread.', premium: false, swatch: '#C47B5A', emoji: '🍓', coinPrice: 80 },
   { id: 'space', name: 'Space', blurb: 'Orbits and a quiet moon.', premium: false, swatch: '#1C2348', emoji: '🪐', coinPrice: 100 },
   { id: 'witchy', name: 'Witchy', blurb: 'Candles, bats, and a silver moon.', premium: true, swatch: '#2E2148', emoji: '🌙' },
-  { id: 'holiday', name: 'Holiday', blurb: 'Seasonal bows and winter stars.', premium: false, swatch: '#D4536A', emoji: '🎁', coinPrice: 70 },
+  { id: 'holiday', name: 'Holiday', blurb: 'Older winter stickers. Kept if you already own them.', premium: false, swatch: '#D4536A', emoji: '🎁', coinPrice: 70, hidden: true },
   { id: 'animals', name: 'Animals', blurb: 'A pocket zoo for the margin.', premium: false, swatch: '#F4A3B8', emoji: '🐰', coinPrice: 80 },
   { id: 'pals', name: 'Pal pack', blurb: 'Stickers that match the pals.', premium: false, swatch: '#E7B7F3', emoji: '🐱', coinPrice: 60 },
+  ...SEASONAL_PACKS,
 ];
 
 export const STICKERS: StickerDef[] = [
@@ -290,6 +292,7 @@ export const STICKERS: StickerDef[] = [
     ['Foil butterfly', 'butterfly', 'legendary', 'premium', P.chrome],
     ['Star crown', 'crown', 'epic', 'premium', P.lemon],
   ]),
+  ...SEASONAL_STICKERS,
 ];
 
 export function getPack(id: string): PackDef | undefined {

@@ -7,9 +7,10 @@ import { RewardCard } from '@/src/components/RewardCard';
 import { ReviewPrompt, useReviewMoment } from '@/src/components/ReviewPrompt';
 import { Screen } from '@/src/components/Screen';
 import { todayKey } from '@/src/logic/dates';
+import { rewardPoolFor } from '@/src/logic/packs';
 import { SPIN_SEGMENTS, resolveReward, spinReward, type ResolvedReward } from '@/src/logic/rewards';
+import { birthdayFrom } from '@/src/logic/seasons';
 import { useDiary } from '@/src/store/useDiary';
-import { STICKERS } from '@/src/stickers/catalog';
 import { useTheme } from '@/src/theme/BookTheme';
 
 function wedge(cx: number, cy: number, r: number, start: number, end: number) {
@@ -44,7 +45,9 @@ export default function SpinScreen() {
     setSpinning(true);
     rotation.setValue(0);
     Animated.timing(rotation, { toValue: target, duration: 3400, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start(() => {
-      const resolved = resolveReward(spinReward(index), STICKERS, wallet.ownedStickerIds, wallet.ownedOutfitIds);
+      const settings = useDiary.getState().settings;
+      const pool = rewardPoolFor(settings.debugDate, birthdayFrom(settings.birthdayMonth, settings.birthdayDay));
+      const resolved = resolveReward(spinReward(index), pool, wallet.ownedStickerIds, wallet.ownedOutfitIds);
       grantReward(resolved);
       markSpin(today);
       setReward(resolved);

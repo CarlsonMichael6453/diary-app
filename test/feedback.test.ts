@@ -105,7 +105,7 @@ describe('feedback payload', () => {
     assert.equal(buildFeedbackPayload({ ...draft(), rating: 'maybe' }), null);
   });
 
-  it('does not open mail while the inbox is still the placeholder', () => {
+  it('opens mail to the configured inbox and refuses the placeholder', () => {
     const payload = buildFeedbackPayload(draft());
     assert.ok(payload);
     assert.equal(isFeedbackConfigured('feedback@example.com'), false);
@@ -113,7 +113,11 @@ describe('feedback payload', () => {
     assert.equal(isFeedbackConfigured(''), false);
     assert.equal(isFeedbackConfigured('not-an-email'), false);
     assert.equal(feedbackMailUrl('feedback@example.com', payload), null);
-    assert.equal(feedbackMailUrl(FEEDBACK_EMAIL, payload) === null, !isFeedbackConfigured(FEEDBACK_EMAIL));
+    assert.equal(FEEDBACK_EMAIL, 'bykeh1sy@mail.grokbot.com');
+    assert.equal(isFeedbackConfigured(FEEDBACK_EMAIL), true);
+    const live = feedbackMailUrl(FEEDBACK_EMAIL, payload);
+    assert.ok(live?.startsWith('mailto:bykeh1sy@mail.grokbot.com?'));
+    assert.equal(live?.includes('feedback@example.com'), false);
     const url = feedbackMailUrl('hello@diary.test', payload);
     assert.ok(url?.startsWith('mailto:hello@diary.test?'));
     assert.equal(url?.includes('feedback@example.com'), false);

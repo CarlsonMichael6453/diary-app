@@ -66,9 +66,7 @@ Entries, photos, coins, and the passcode hash stay in on-device storage (AsyncSt
 
 **Send feedback** sits at the top of Settings and on the diary home. The form asks for a thumbs up or down, or 1 to 5 stars, a note, and an optional reply-to email. It adds the app version, the platform (web, iOS, or Android), and the OS version, then opens a `mailto:` link. There is no backend.
 
-The only destination address is `FEEDBACK_EMAIL` in [`src/config.ts`](src/config.ts).
-
-**TODO:** change `feedback@example.com` to a real inbox before you rely on feedback. While that placeholder is still set, the form says feedback isn’t configured and does not open a mail link.
+The only destination address is `FEEDBACK_EMAIL` in [`src/config.ts`](src/config.ts). If that value is ever set back to the `feedback@example.com` placeholder, the form says feedback isn’t configured and does not open a mail link.
 
 The form says “Your diary entries are never included.” The mail body is only the rating, the note, the optional reply-to, the version, the platform, and the OS version. Entries, titles, moods, photos, search terms, and sticker data are not read and not attached.
 

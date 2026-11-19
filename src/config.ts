@@ -1,11 +1,9 @@
 /**
  * Inbox for Send feedback. The mailto link is built only from this value.
- *
- * TODO: Change FEEDBACK_EMAIL before you rely on feedback.
- * `feedback@example.com` is a placeholder, not a real inbox. While it is still
- * set, the form says feedback is not configured and does not open a mail link.
+ * `feedback@example.com` is not a real inbox. If this is set back to that
+ * placeholder, the form says feedback is not configured and does not open a mail link.
  */
-export const FEEDBACK_EMAIL = 'feedback@example.com';
+export const FEEDBACK_EMAIL = 'bykeh1sy@mail.grokbot.com';
 
 const FEEDBACK_EMAIL_PLACEHOLDER = 'feedback@example.com';
 

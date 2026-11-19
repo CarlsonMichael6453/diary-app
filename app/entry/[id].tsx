@@ -19,6 +19,7 @@ import { uid } from '@/src/logic/id';
 import { writingStreak } from '@/src/logic/streak';
 import type { DiaryEntry, StickerPlacement } from '@/src/models/types';
 import { lightTap } from '@/src/services/haptics';
+import { playPageTurn } from '@/src/services/sounds';
 import { pickDiaryPhoto } from '@/src/services/photos';
 import { useDiary } from '@/src/store/useDiary';
 import { PACKS, stickersInPack } from '@/src/stickers/catalog';
@@ -151,9 +152,9 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
           <Paper style={{ minHeight: 640 }}>
             <View pointerEvents={decorate ? 'none' : 'auto'} style={[padding, { zIndex: decorate ? 0 : 3 }]}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Pressable onPress={() => setDraft({ ...draft, date: addDays(draft.date, -1) })}><Text style={{ color: theme.colors.paperInk, fontSize: 20 }}>‹</Text></Pressable>
+                <Pressable onPress={() => { playPageTurn(); setDraft({ ...draft, date: addDays(draft.date, -1) }); }}><Text style={{ color: theme.colors.paperInk, fontSize: 20 }}>‹</Text></Pressable>
                 <Text style={{ color: theme.colors.paperSoft, fontFamily: theme.body }}>{formatLong(draft.date)}</Text>
-                <Pressable onPress={() => setDraft({ ...draft, date: addDays(draft.date, 1) })}><Text style={{ color: theme.colors.paperInk, fontSize: 20 }}>›</Text></Pressable>
+                <Pressable onPress={() => { playPageTurn(); setDraft({ ...draft, date: addDays(draft.date, 1) }); }}><Text style={{ color: theme.colors.paperInk, fontSize: 20 }}>›</Text></Pressable>
               </View>
               <Text style={{ color: theme.colors.paperInk, fontFamily: theme.script, fontSize: 22, marginTop: 8 }}>{prompt}</Text>
               <MoodPicker value={draft.mood} onChange={(mood) => setDraft({ ...draft, mood })} />
@@ -212,7 +213,7 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
             </View>
             {buddy ? (
               <View
-                pointerEvents="none"
+                pointerEvents="box-none"
                 style={[
                   { zIndex: 6 },
                   perch === 'tr'
@@ -238,6 +239,7 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
                   celebrate={celebrate}
                   showLine
                   size={118}
+                  taps
                 />
               </View>
             ) : null}
@@ -249,8 +251,8 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
               <Text style={{ color: draft.themeOverride ? theme.colors.chipInk : theme.colors.onAccent, fontFamily: theme.body }}>Match the book</Text>
             </Pressable>
             {THEMES.map((item) => (
-              <Pressable key={item.id} onPress={() => setDraft({ ...draft, themeOverride: item.id })} style={{ padding: 10, borderRadius: 12, backgroundColor: item.colors.paper, borderWidth: draft.themeOverride === item.id ? 2 : 0, borderColor: item.colors.accent }}>
-                <Text style={{ color: item.colors.paperInk, fontFamily: item.body }}>{item.emoji} {item.name}</Text>
+              <Pressable key={item.id} onPress={() => { if (item.premium && !wallet.premium) { router.push('/paywall' as Href); return; } setDraft({ ...draft, themeOverride: item.id }); }} style={{ padding: 10, borderRadius: 12, backgroundColor: item.colors.paper, borderWidth: draft.themeOverride === item.id ? 2 : 0, borderColor: item.colors.accent, opacity: item.premium && !wallet.premium ? 0.55 : 1 }}>
+                <Text style={{ color: item.colors.paperInk, fontFamily: item.body }}>{item.emoji} {item.name}{item.premium ? ' · Plus' : ''}</Text>
               </Pressable>
             ))}
           </ScrollView>

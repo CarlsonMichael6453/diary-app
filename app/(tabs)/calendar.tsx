@@ -7,6 +7,7 @@ import { Button } from '@/src/components/ui';
 import { getMood } from '@/src/data/moods';
 import { formatPretty, monthLabel, todayKey } from '@/src/logic/dates';
 import type { DiaryEntry } from '@/src/models/types';
+import { playPageTurn } from '@/src/services/sounds';
 import { entriesOn, useDiary } from '@/src/store/useDiary';
 import { useTheme } from '@/src/theme/BookTheme';
 
@@ -36,6 +37,7 @@ export default function CalendarScreen() {
   const selectedEntries = selected ? entriesOn(entries, selected) : [];
 
   function shift(delta: number) {
+    playPageTurn();
     const date = new Date(cursor.year, cursor.month + delta, 1);
     setCursor({ year: date.getFullYear(), month: date.getMonth() });
     setSelected(null);

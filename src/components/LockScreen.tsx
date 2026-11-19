@@ -1,8 +1,11 @@
-import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { BookCover } from './BookCover';
 import { biometricAvailable, unlockWithBiometric } from '../services/biometrics';
+import { playPageTurn } from '../services/sounds';
 import { checkPasscode } from '../services/secure';
+import { useReduceMotion } from '../theme/useReduceMotion';
 import { useTheme } from '../theme/BookTheme';
 import { useDiary } from '../store/useDiary';
 
@@ -84,51 +87,124 @@ export function showPasscodeError(message: string) {
 
 export function LockOverlay() {
   const theme = useTheme();
+  const reduceMotion = useReduceMotion();
+  const lockOnOpen = useDiary((state) => state.settings.lockOnOpen);
   const lockEnabled = useDiary((state) => state.settings.lockEnabled);
-  const biometricsOn = useDiary((state) => state.settings.biometricsEnabled);
-  const [unlocked, setUnlocked] = useState(false);
+  const bookTitle = useDiary((state) => state.settings.bookTitle);
+  const [open, setOpen] = useState(false);
   const [bio, setBio] = useState(false);
+  const swing = useRef(new Animated.Value(0)).current;
+  const appState = useRef(AppState.currentState);
+  const prompted = useRef(false);
+
+  function shut() {
+    swing.setValue(0);
+    setOpen(false);
+    prompted.current = false;
+  }
+
+  function finishOpen() {
+    setOpen(true);
+  }
+
+  function openBook() {
+    playPageTurn();
+    if (reduceMotion) {
+      finishOpen();
+      return;
+    }
+    Animated.timing(swing, { toValue: 1, duration: 560, useNativeDriver: true }).start(({ finished }) => {
+      if (finished) finishOpen();
+    });
+  }
 
   useEffect(() => {
-    if (!lockEnabled) setUnlocked(false);
-  }, [lockEnabled]);
+    const subscription = AppState.addEventListener('change', (next) => {
+      const returning = Boolean(appState.current?.match(/inactive|background/)) && next === 'active';
+      appState.current = next;
+      if (returning && useDiary.getState().settings.lockOnOpen) shut();
+    });
+    return () => subscription.remove();
+  }, [swing]);
 
   useEffect(() => {
-    if (!lockEnabled || !biometricsOn) return;
+    if (lockOnOpen || open) return;
+    const timer = setTimeout(openBook, 900);
+    return () => clearTimeout(timer);
+    // The brief cover plays once each time the book is shut.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lockOnOpen, open]);
+
+  useEffect(() => {
+    if (!lockOnOpen || open) return;
     biometricAvailable().then((available) => {
       setBio(available);
-      if (available) {
+      if (available && !prompted.current) {
+        prompted.current = true;
         unlockWithBiometric().then((ok) => {
-          if (ok) setUnlocked(true);
+          if (ok) openBook();
         });
       }
     });
-  }, [lockEnabled, biometricsOn]);
+    // Prompt once per closed state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lockOnOpen, open]);
 
-  if (!lockEnabled || unlocked) return null;
+  if (open) return null;
+
+  const coverStyle = {
+    transform: [
+      { perspective: 900 },
+      {
+        rotateY: swing.interpolate({
+          inputRange: [0, 1],
+          outputRange: ['0deg', '-78deg'],
+        }),
+      },
+    ],
+    opacity: swing.interpolate({ inputRange: [0, 0.72, 1], outputRange: [1, 1, 0] }),
+  };
 
   return (
     <View style={[styles.overlay, { backgroundColor: theme.colors.bg }]}>
-      <PasscodePad
-        title="Diary locked"
-        subtitle="Enter the four-digit passcode."
-        onComplete={async (pin) => {
-          const ok = await checkPasscode(pin);
-          if (ok) setUnlocked(true);
-          else showPasscodeError('That passcode does not open the book.');
-        }}
-      />
-      {bio ? (
-        <Pressable onPress={() => unlockWithBiometric().then((ok) => ok && setUnlocked(true))} style={{ marginTop: 12 }}>
-          <Text style={{ color: theme.colors.accent, fontFamily: theme.body, fontSize: 16, textAlign: 'center' }}>Use Face ID or fingerprint</Text>
-        </Pressable>
-      ) : null}
+      <Animated.View style={coverStyle}>
+        <BookCover title={bookTitle} theme={theme} />
+      </Animated.View>
+      {lockOnOpen && lockEnabled ? (
+        <View style={{ marginTop: 18, width: '100%' }}>
+          <PasscodePad
+            title="Open the book"
+            subtitle="Passcode, or Face ID when this phone has it."
+            onComplete={async (pin) => {
+              const ok = await checkPasscode(pin);
+              if (ok) openBook();
+              else showPasscodeError('That passcode does not open the book.');
+            }}
+          />
+          {bio ? (
+            <Pressable onPress={() => unlockWithBiometric().then((ok) => ok && openBook())} style={{ marginTop: 8 }}>
+              <Text style={{ color: theme.colors.accent, fontFamily: theme.body, fontSize: 16, textAlign: 'center' }}>Use Face ID or fingerprint</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : lockOnOpen ? (
+        <View style={{ marginTop: 18, alignItems: 'center', gap: 8, width: '100%', maxWidth: 420 }}>
+          <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, textAlign: 'center' }}>
+            {bio ? 'Face ID can open it. A passcode in Settings keeps it shut on the web too.' : 'Tap the cover to open. Set a passcode in Settings if you want it to stay shut.'}
+          </Text>
+          <Pressable onPress={openBook} accessibilityRole="button" accessibilityLabel="Open the diary">
+            <Text style={{ color: theme.colors.accent, fontFamily: theme.body, fontSize: 18 }}>Open</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, marginTop: 16 }}>Opening…</Text>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 40, justifyContent: 'center', padding: 24 },
+  overlay: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 40, justifyContent: 'center', alignItems: 'center', padding: 24 },
   padWrap: { width: '100%', maxWidth: 360, alignSelf: 'center' },
   sub: { textAlign: 'center', marginTop: 8, fontSize: 15 },
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 12, marginVertical: 18 },

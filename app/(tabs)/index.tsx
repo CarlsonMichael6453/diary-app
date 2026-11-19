@@ -50,7 +50,7 @@ export default function DiaryHome() {
         </View>
       </View>
 
-      <Pressable onPress={() => router.push('/buddies' as Href)} style={{ marginTop: 14 }} accessibilityLabel="Change your buddy">
+      <View style={{ marginTop: 14 }}>
         <BuddyView
           buddyId={settings.buddyId}
           outfits={settings.outfitIds}
@@ -63,8 +63,10 @@ export default function DiaryHome() {
           showLine
           layout="row"
           size={120}
+          taps
+          onPress={() => router.push('/buddies' as Href)}
         />
-      </Pressable>
+      </View>
 
       {showNudge ? (
         <View style={{ marginTop: 12, backgroundColor: theme.colors.card, borderRadius: theme.radius, padding: 14, gap: 8 }}>

@@ -1,3 +1,5 @@
+import { MORE_THEMES } from './moreThemes';
+
 export type ThemeId =
   | 'cutesy'
   | 'goth'
@@ -8,7 +10,26 @@ export type ThemeId =
   | 'minimal'
   | 'kawaii'
   | 'academia'
-  | 'ocean';
+  | 'ocean'
+  | 'neon'
+  | 'retro'
+  | 'psychedelic'
+  | 'vaporwave'
+  | 'galaxy'
+  | 'grunge'
+  | 'steampunk'
+  | 'witchy'
+  | 'candy'
+  | 'forest'
+  | 'sunset'
+  | 'cyberpunk'
+  | 'neon-glow'
+  | 'galaxy-drift'
+  | 'lava-lamp'
+  | 'sparkle-rain'
+  | 'aurora';
+
+export type ThemeMotion = 'none' | 'neon' | 'galaxy' | 'lava' | 'sparkle' | 'aurora';
 
 export type PaperStyle = 'lined' | 'dotted' | 'grid' | 'plain' | 'parchment';
 export type DecorKind =
@@ -57,6 +78,8 @@ export type Theme = {
     card: string;
     onAccent: string;
   };
+  premium?: boolean;
+  motion?: ThemeMotion;
 };
 
 export const THEMES: Theme[] = [
@@ -410,6 +433,7 @@ export const THEMES: Theme[] = [
       onAccent: '#F4FBFC',
     },
   },
+  ...MORE_THEMES,
 ];
 
 export function getTheme(id: string | null | undefined): Theme {

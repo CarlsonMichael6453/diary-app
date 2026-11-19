@@ -36,6 +36,11 @@ export type Settings = {
   buddyId: string;
   outfitIds: string[];
   dismissedNudgeDate: string | null;
+  soundEnabled: boolean;
+  buddySounds: boolean;
+  pageSounds: boolean;
+  soundVolume: number;
+  lockOnOpen: boolean;
 };
 
 export type Wallet = {

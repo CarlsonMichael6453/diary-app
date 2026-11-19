@@ -11,6 +11,7 @@ import { useDiary } from '@/src/store/useDiary';
 import { PACKS, stickersInPack } from '@/src/stickers/catalog';
 import { StickerView } from '@/src/stickers/StickerView';
 import { useTheme } from '@/src/theme/BookTheme';
+import { THEMES } from '@/src/theme/themes';
 
 export default function PaywallScreen() {
   const theme = useTheme();
@@ -46,7 +47,7 @@ export default function PaywallScreen() {
         <Text style={{ color: theme.colors.onAccent, fontFamily: theme.body, fontSize: 12 }}>TEST MODE</Text>
         <Text style={{ color: theme.colors.onAccent, fontFamily: theme.display, fontSize: 36 }}>Diary Plus</Text>
         <Text style={{ color: theme.colors.onAccent, fontFamily: theme.body }}>
-          Rare, epic, and legendary packs, plus Ember and Lumi. This screen is a mock checkout so RevenueCat can be plugged in later. Nothing is charged.
+          Rare, epic, and legendary packs, Ember and Lumi, and the animated book styles. This screen is a mock checkout so RevenueCat can be plugged in later. Nothing is charged.
         </Text>
       </View>
       {premium ? <Text style={{ color: theme.colors.ink, fontFamily: theme.body, marginTop: 12 }}>You already have Diary Plus on this device.</Text> : null}
@@ -59,6 +60,8 @@ export default function PaywallScreen() {
           </View>
         ))}
       </View>
+      <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 26, marginTop: 8 }}>Animated styles</Text>
+      <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>{THEMES.filter((item) => item.premium).map((item) => item.name).join(', ')}</Text>
       <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 26, marginTop: 8 }}>Packs</Text>
       {premiumPacks.map((pack) => (
         <View key={pack.id} style={{ marginTop: 10 }}>

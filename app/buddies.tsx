@@ -6,6 +6,7 @@ import { BUDDIES, OUTFITS, canEquipOutfit, getBuddy } from '@/src/buddies/catalo
 import { BuddyView } from '@/src/buddies/BuddyView';
 import { Screen } from '@/src/components/Screen';
 import { Button, CoinPill } from '@/src/components/ui';
+import { playBuddySound } from '@/src/services/sounds';
 import { useDiary } from '@/src/store/useDiary';
 import { useTheme } from '@/src/theme/BookTheme';
 
@@ -53,6 +54,7 @@ export default function BuddiesScreen() {
                   router.push('/paywall' as Href);
                   return;
                 }
+                playBuddySound(buddy.id);
                 setBuddy(buddy.id);
               }}
               style={{ width: '47%', padding: 8, borderRadius: 16, backgroundColor: theme.colors.card, borderWidth: selected ? 3 : 0, borderColor: theme.colors.accent, opacity: locked ? 0.55 : 1 }}

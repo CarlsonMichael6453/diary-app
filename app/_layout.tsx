@@ -15,6 +15,7 @@ import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { LockOverlay } from '@/src/components/LockScreen';
+import { SoundRoutes } from '@/src/components/SoundRoutes';
 import { useHydrated } from '@/src/store/useDiary';
 import { BookThemeProvider } from '@/src/theme/BookTheme';
 
@@ -62,6 +63,7 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="paywall" options={{ presentation: 'modal' }} />
         </Stack>
+        <SoundRoutes />
         <LockOverlay />
       </BookThemeProvider>
     </SafeAreaProvider>

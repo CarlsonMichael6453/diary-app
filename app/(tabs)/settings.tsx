@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Platform, Pressable, Share, Text, TextInput, View } from 'react-native';
 
 import { getBuddy } from '@/src/buddies/catalog';
+import { LibraryPanel } from '@/src/components/LibraryPanel';
 import { PasscodePad } from '@/src/components/LockScreen';
 import { Screen } from '@/src/components/Screen';
 import { Button, Confirm, FieldLabel } from '@/src/components/ui';
@@ -11,6 +12,7 @@ import { biometricAvailable } from '@/src/services/biometrics';
 import { checkPasscode, clearPasscode, hasPasscode, savePasscode } from '@/src/services/secure';
 import { useDiary } from '@/src/store/useDiary';
 import { useTheme } from '@/src/theme/BookTheme';
+import { pickSaying } from '@/src/logic/sayings';
 import { THEMES, type ThemeId } from '@/src/theme/themes';
 
 const HOURS = [8, 12, 18, 20, 21, 22];
@@ -36,15 +38,17 @@ export default function SettingsScreen() {
     biometricAvailable().then(setBio);
   }, []);
 
-  async function toggleReminder(enabled: boolean) {
-    patchSettings({ reminderEnabled: enabled });
-    const message = await syncReminder(enabled, settings.reminderHour, settings.reminderMinute);
-    setNotice(message);
-  }
-
-  async function pickHour(hour: number) {
-    patchSettings({ reminderHour: hour, reminderMinute: 0, reminderEnabled: true });
-    const message = await syncReminder(true, hour, 0);
+  async function remind(enabled: boolean, hour: number) {
+    const buddy = getBuddy(settings.buddyId);
+    const saying = pickSaying(settings.lastSayingId, settings.buddyId);
+    patchSettings({ reminderEnabled: enabled, reminderHour: hour, reminderMinute: enabled ? settings.reminderMinute : settings.reminderMinute, lastSayingId: saying.id });
+    const message = await syncReminder(
+      enabled,
+      hour,
+      enabled && hour === settings.reminderHour ? settings.reminderMinute : 0,
+      settings.palNotifications && buddy ? { name: buddy.name, emoji: '📔', saying: saying.text } : undefined,
+      { start: settings.quietStart, end: settings.quietEnd },
+    );
     setNotice(message);
   }
 
@@ -77,7 +81,10 @@ export default function SettingsScreen() {
                   router.push('/paywall' as Href);
                   return;
                 }
-                patchSettings({ themeId: item.id as ThemeId });
+                patchSettings({
+                  themeId: item.id as ThemeId,
+                  books: settings.books.map((book) => (book.id === settings.activeBookId ? { ...book, themeId: item.id as ThemeId } : book)),
+                });
               }}
               style={{
                 width: '47%',
@@ -109,9 +116,9 @@ export default function SettingsScreen() {
         {Platform.OS === 'web' ? 'On the web this is an in-app nudge. On a phone it is a local notification.' : 'A local notification on this phone. Nothing leaves the device.'}
       </Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-        <Button label={settings.reminderEnabled ? 'Nudge is on' : 'Turn nudge on'} tone={settings.reminderEnabled ? 'primary' : 'ghost'} onPress={() => toggleReminder(!settings.reminderEnabled)} />
+        <Button label={settings.reminderEnabled ? 'Nudge is on' : 'Turn nudge on'} tone={settings.reminderEnabled ? 'primary' : 'ghost'} onPress={() => remind(!settings.reminderEnabled, settings.reminderHour)} />
         {HOURS.map((hour) => (
-          <Pressable key={hour} onPress={() => pickHour(hour)} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: settings.reminderHour === hour ? theme.colors.accent : theme.colors.chip }}>
+          <Pressable key={hour} onPress={() => remind(true, hour)} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: settings.reminderHour === hour ? theme.colors.accent : theme.colors.chip }}>
             <Text style={{ color: settings.reminderHour === hour ? theme.colors.onAccent : theme.colors.chipInk, fontFamily: theme.body }}>{hour % 12 || 12}{hour < 12 ? 'am' : 'pm'}</Text>
           </Pressable>
         ))}
@@ -151,6 +158,11 @@ export default function SettingsScreen() {
           tone={settings.lockOnOpen ? 'primary' : 'ghost'}
           onPress={() => patchSettings({ lockOnOpen: !settings.lockOnOpen })}
         />
+        <Button
+          label={settings.shakeToOpen ? 'Shake or wiggle to open' : 'Shake to open is off'}
+          tone={settings.shakeToOpen ? 'primary' : 'ghost'}
+          onPress={() => patchSettings({ shakeToOpen: !settings.shakeToOpen })}
+        />
       </View>
       <View style={{ gap: 8 }}>
         <Button
@@ -177,6 +189,8 @@ export default function SettingsScreen() {
       <View style={{ marginTop: 8 }}>
         <Button label={wallet.premium ? 'See Diary Plus' : 'Open the paywall'} onPress={() => router.push('/paywall' as Href)} />
       </View>
+
+      <LibraryPanel />
 
       <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 26, marginTop: 18 }}>On this device</Text>
       <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, marginBottom: 8 }}>Pages stay in local storage. A backup file is the seam for a future sync.</Text>

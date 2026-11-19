@@ -98,7 +98,7 @@ export default function MemoryScreen() {
         {deck.map((card, index) => {
           const faceUp = open.includes(index) || matched.includes(card.key);
           return (
-            <Pressable key={card.uid} onPress={() => tap(index)} style={{ width: '22%', aspectRatio: 1, borderRadius: 14, backgroundColor: faceUp ? theme.colors.card : theme.colors.accent, alignItems: 'center', justifyContent: 'center' }}>
+            <Pressable key={card.uid} onPress={() => tap(index)} style={{ width: '22%', aspectRatio: 1, borderRadius: 14, backgroundColor: faceUp ? 'transparent' : theme.colors.accent, alignItems: 'center', justifyContent: 'center' }}>
               {faceUp ? <StickerView stickerId={card.stickerId} size={58} /> : <Text style={{ color: theme.colors.onAccent, fontFamily: theme.display, fontSize: 22 }}>?</Text>}
             </Pressable>
           );

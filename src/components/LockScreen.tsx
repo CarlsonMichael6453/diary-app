@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, AppState, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, AppState, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { isShake, isWiggle, type MotionSample } from '../logic/motion';
 import { BookCover } from './BookCover';
 import { biometricAvailable, unlockWithBiometric } from '../services/biometrics';
 import { playPageTurn } from '../services/sounds';
@@ -89,11 +90,14 @@ export function LockOverlay() {
   const theme = useTheme();
   const reduceMotion = useReduceMotion();
   const lockOnOpen = useDiary((state) => state.settings.lockOnOpen);
+  const shakeToOpen = useDiary((state) => state.settings.shakeToOpen);
   const lockEnabled = useDiary((state) => state.settings.lockEnabled);
   const bookTitle = useDiary((state) => state.settings.bookTitle);
   const [open, setOpen] = useState(false);
   const [bio, setBio] = useState(false);
   const swing = useRef(new Animated.Value(0)).current;
+  const jiggle = useRef(new Animated.Value(0)).current;
+  const samples = useRef<MotionSample[]>([]);
   const appState = useRef(AppState.currentState);
   const prompted = useRef(false);
 
@@ -127,8 +131,44 @@ export function LockOverlay() {
     return () => subscription.remove();
   }, [swing]);
 
+  function reactToMotion(x: number, kind: 'shake' | 'wiggle') {
+    if (!shakeToOpen || reduceMotion || open) return;
+    const now = Date.now();
+    samples.current = [...samples.current, { t: now, x }].slice(-30);
+    const hit = kind === 'shake' ? isShake(samples.current, now) : isWiggle(samples.current, now);
+    if (!reduceMotion) {
+      Animated.sequence([
+        Animated.timing(jiggle, { toValue: 1, duration: 70, useNativeDriver: true }),
+        Animated.timing(jiggle, { toValue: -1, duration: 90, useNativeDriver: true }),
+        Animated.timing(jiggle, { toValue: 0, duration: 70, useNativeDriver: true }),
+      ]).start();
+    }
+    if (!hit) return;
+    samples.current = [];
+    if (lockOnOpen && (lockEnabled || bio)) {
+      if (bio) unlockWithBiometric().then((ok) => ok && openBook());
+      return;
+    }
+    openBook();
+  }
+
   useEffect(() => {
-    if (lockOnOpen || open) return;
+    if (Platform.OS === 'web' || !shakeToOpen || reduceMotion || open) return;
+    let remove = () => {};
+    import('expo-sensors')
+      .then(({ Accelerometer }) => {
+        Accelerometer.setUpdateInterval(80);
+        const subscription = Accelerometer.addListener(({ x, y, z }) => reactToMotion(x + y + z, 'shake'));
+        remove = () => subscription.remove();
+      })
+      .catch(() => undefined);
+    return () => remove();
+    // Motion samples live in a ref. The listener is rebuilt when the gates change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shakeToOpen, reduceMotion, open, lockOnOpen, lockEnabled, bio]);
+
+  useEffect(() => {
+    if (lockOnOpen || open || (shakeToOpen && !reduceMotion)) return;
     const timer = setTimeout(openBook, 900);
     return () => clearTimeout(timer);
     // The brief cover plays once each time the book is shut.
@@ -161,12 +201,22 @@ export function LockOverlay() {
           outputRange: ['0deg', '-78deg'],
         }),
       },
+      {
+        rotate: jiggle.interpolate({ inputRange: [-1, 0, 1], outputRange: ['-7deg', '0deg', '7deg'] }),
+      },
     ],
     opacity: swing.interpolate({ inputRange: [0, 0.72, 1], outputRange: [1, 1, 0] }),
   };
 
   return (
-    <View style={[styles.overlay, { backgroundColor: theme.colors.bg }]}>
+    <View
+      style={[styles.overlay, { backgroundColor: theme.colors.bg }]}
+      onPointerMove={
+        Platform.OS === 'web' && shakeToOpen
+          ? (event) => reactToMotion((event.nativeEvent as { pageX?: number }).pageX ?? 0, 'wiggle')
+          : undefined
+      }
+    >
       <Animated.View style={coverStyle}>
         <BookCover title={bookTitle} theme={theme} />
       </Animated.View>
@@ -192,8 +242,9 @@ export function LockOverlay() {
           <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, textAlign: 'center' }}>
             {bio ? 'Face ID can open it. A passcode in Settings keeps it shut on the web too.' : 'Tap the cover to open. Set a passcode in Settings if you want it to stay shut.'}
           </Text>
-          <Pressable onPress={openBook} accessibilityRole="button" accessibilityLabel="Open the diary">
-            <Text style={{ color: theme.colors.accent, fontFamily: theme.body, fontSize: 18 }}>Open</Text>
+          <Text style={{ color: theme.colors.ink, fontFamily: theme.body, textAlign: 'center' }}>{Platform.OS === 'web' ? 'Wiggle to open' : 'Shake to open'}</Text>
+          <Pressable onPress={openBook} accessibilityRole="button" accessibilityLabel="Tap to open">
+            <Text style={{ color: theme.colors.accent, fontFamily: theme.body, fontSize: 18 }}>Tap to open</Text>
           </Pressable>
         </View>
       ) : (

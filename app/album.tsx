@@ -5,6 +5,7 @@ import { Pressable, Text, View } from 'react-native';
 import { Screen } from '@/src/components/Screen';
 import { Button, CoinPill } from '@/src/components/ui';
 import { canUseItem, rarityLabel } from '@/src/logic/access';
+import { PACK_EMOJI, packIsOwned } from '@/src/logic/packs';
 import { useDiary } from '@/src/store/useDiary';
 import { PACKS, stickersInPack } from '@/src/stickers/catalog';
 import { StickerView } from '@/src/stickers/StickerView';
@@ -25,6 +26,7 @@ export default function AlbumScreen() {
         <CoinPill coins={wallet.coins} />
       </View>
       <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 36, marginTop: 8 }}>Sticker album</Text>
+      <Button label="Sticker pack store" onPress={() => router.push('/sticker-store' as Href)} />
       <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>{pack.blurb}</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginVertical: 12 }}>
         {PACKS.map((item) => (
@@ -35,6 +37,17 @@ export default function AlbumScreen() {
       </View>
       {pack.premium && !wallet.premium ? <Button label="This pack is Diary Plus" onPress={() => router.push('/paywall' as Href)} /> : null}
       {note ? <Text style={{ color: theme.colors.ink, fontFamily: theme.body, marginVertical: 8 }}>{note}</Text> : null}
+      <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 22, marginTop: 8 }}>Owned packs</Text>
+      {PACKS.filter((item) => packIsOwned(item, wallet.ownedPackIds, wallet.premium)).map((ownedPack) => (
+        <View key={ownedPack.id} style={{ marginTop: 12 }}>
+          <Text style={{ color: theme.colors.ink, fontFamily: theme.body }}>{ownedPack.emoji ?? PACK_EMOJI[ownedPack.id] ?? '✦'} {ownedPack.name}</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
+            {stickersInPack(ownedPack.id).filter((sticker) => canUseItem(sticker, { ownedIds: wallet.ownedStickerIds, premium: wallet.premium })).map((sticker) => (
+              <StickerView key={sticker.id} stickerId={sticker.id} size={64} />
+            ))}
+          </View>
+        </View>
+      ))}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 12 }}>
         {stickersInPack(pack.id).map((sticker) => {
           const owned = canUseItem(sticker, { ownedIds: wallet.ownedStickerIds, premium: wallet.premium });

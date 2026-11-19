@@ -13,6 +13,7 @@ const config: ExpoConfig = {
     ...app.expo.web,
     output: 'single',
   },
+  plugins: [...(app.expo.plugins ?? []), 'expo-sharing', './plugins/withDiaryWidgets'],
   experiments: {
     ...app.expo.experiments,
     typedRoutes: true,

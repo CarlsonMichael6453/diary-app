@@ -1,9 +1,21 @@
 import { Platform } from 'react-native';
 
-export async function syncReminder(enabled: boolean, hour: number, minute: number): Promise<string> {
+export async function syncReminder(
+  enabled: boolean,
+  hour: number,
+  minute: number,
+  pal?: { name: string; emoji: string; saying: string },
+  quiet?: { start: number; end: number },
+): Promise<string> {
+  const { inQuietHours } = await import('../logic/sayings');
+  if (quiet && inQuietHours(hour, quiet.start, quiet.end)) {
+    return 'That hour is inside quiet hours, so no reminder was scheduled.';
+  }
+  const title = pal ? `${pal.emoji} ${pal.name}` : 'Your diary is open';
+  const body = pal?.saying ?? 'A few lines is enough. Today’s page is waiting.';
   if (Platform.OS === 'web') {
     return enabled
-      ? 'On the website, Diary App nudges you inside the book if today’s page is still blank.'
+      ? `${title} will nudge you inside the book. ${body}`
       : 'The in-app nudge is off.';
   }
   try {
@@ -29,8 +41,8 @@ export async function syncReminder(enabled: boolean, hour: number, minute: numbe
     }
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: 'Your diary is open',
-        body: 'A few lines is enough. Today’s page is waiting.',
+        title,
+        body,
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,

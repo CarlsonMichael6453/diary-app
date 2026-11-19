@@ -10,6 +10,12 @@ export type StickerPlacement = {
   rotation: number;
 };
 
+export type DiaryBook = {
+  id: string;
+  title: string;
+  themeId: ThemeId;
+};
+
 export type DiaryEntry = {
   id: string;
   date: string;
@@ -22,6 +28,14 @@ export type DiaryEntry = {
   createdAt: number;
   updatedAt: number;
   sample?: boolean;
+  bookId?: string;
+  tags?: string[];
+  activities?: string[];
+  templateId?: string | null;
+  voiceNote?: string | null;
+  drawing?: string | null;
+  placeLabel?: string | null;
+  weather?: string | null;
 };
 
 export type Settings = {
@@ -41,11 +55,26 @@ export type Settings = {
   pageSounds: boolean;
   soundVolume: number;
   lockOnOpen: boolean;
+  books: DiaryBook[];
+  activeBookId: string;
+  lastBackupAt: string | null;
+  backupReminderDays: number;
+  encryptAtRest: boolean;
+  locationOnEntry: boolean;
+  weatherOnEntry: boolean;
+  healthCorrelation: boolean;
+  palNotifications: boolean;
+  quietStart: number;
+  quietEnd: number;
+  lastSayingId: string | null;
+  seenWelcome: boolean;
+  shakeToOpen: boolean;
 };
 
 export type Wallet = {
   coins: number;
   ownedStickerIds: string[];
+  ownedPackIds: string[];
   ownedOutfitIds: string[];
   premium: boolean;
   loginStreak: number;
@@ -57,9 +86,10 @@ export type Wallet = {
 };
 
 export type Snapshot = {
-  version: 1;
+  version: 1 | 2;
   exportedAt: string;
   settings: Settings;
   entries: DiaryEntry[];
   wallet: Wallet;
+  books?: DiaryBook[];
 };

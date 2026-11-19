@@ -49,6 +49,8 @@ npx expo start --tunnel
 - **Pal** — Mochi, Batsy, Sprout, Glitter, Prism, Inky, Pip, Nova, Shelly, and Ghosty, or none. Ember the baby dragon and Lumi the unicorn are Diary Plus. Pals react to the mood, the streak, and whether you are writing, and they wear accessories from games, streaks, and coins.
 - **Reminder** — a local daily notification on a phone. On the web, a nudge on the diary if today’s page is still blank.
 - **Lock** — a 4-digit passcode. Face ID and fingerprint are offered on a phone that has them enrolled.
+- **Feedback** — Send feedback on the diary home and in Settings. A rating and a note open an email. Diary pages are not attached.
+- **Review** — after a writing streak of 3 days, or after winning a mini-game, the book may ask “Enjoying Diary App?”. Never at launch, at most every 90 days, and at most 3 times.
 
 Four sample pages are already in the book so the calendar is not empty. Remove them in Settings.
 
@@ -59,6 +61,20 @@ Diary Plus, coin pouches, and restore are a **mock checkout**. The button says t
 ## Privacy and a future sync
 
 Entries, photos, coins, and the passcode hash stay in on-device storage (AsyncStorage, plus the platform secure store for the passcode on a phone). Settings → **Save a backup** writes a versioned JSON snapshot. Restoring that file is the same shape a cloud sync would use. The empty adapter is `src/sync/adapter.ts`.
+
+## Feedback
+
+**Send feedback** sits at the top of Settings and on the diary home. The form asks for a thumbs up or down, or 1 to 5 stars, a note, and an optional reply-to email. It adds the app version, the platform (web, iOS, or Android), and the OS version, then opens a `mailto:` link. There is no backend.
+
+The only destination address is `FEEDBACK_EMAIL` in [`src/config.ts`](src/config.ts). If that value is ever set back to the `feedback@example.com` placeholder, the form says feedback isn’t configured and does not open a mail link.
+
+The form says “Your diary entries are never included.” The mail body is only the rating, the note, the optional reply-to, the version, the platform, and the OS version. Entries, titles, moods, photos, search terms, and sticker data are not read and not attached.
+
+## Store review
+
+A polite “Enjoying Diary App?” can appear right after a page is saved on a writing streak of at least 3 days, or after a mini-game win (memory, a catch round with a score, or the daily spin). It does not appear at launch. Yes opens the native in-app review through `expo-store-review`. On the web that call is a no-op and the prompt says the store card opens on iOS and Android. Not really opens Send feedback.
+
+The last-asked time and the count are stored on the device, apart from the diary. The gap is 90 days and the cap is 3 asks. Those thresholds live next to `FEEDBACK_EMAIL` in [`src/config.ts`](src/config.ts).
 
 ## Tests
 

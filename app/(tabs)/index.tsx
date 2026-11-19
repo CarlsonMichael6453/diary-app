@@ -32,6 +32,14 @@ export default function DiaryHome() {
         <View style={{ flex: 1 }}>
           <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, fontSize: 14 }}>Hello, {settings.ownerName}</Text>
           <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 36 }}>{settings.bookTitle}</Text>
+          <Pressable
+            onPress={() => router.push('/feedback' as Href)}
+            accessibilityRole="button"
+            accessibilityLabel="Send feedback"
+            style={{ alignSelf: 'flex-start', marginTop: 2 }}
+          >
+            <Text style={{ color: theme.colors.accent, fontFamily: theme.body, fontSize: 15 }}>Send feedback</Text>
+          </Pressable>
         </View>
         <CoinPill coins={coins} />
       </View>

@@ -9,6 +9,7 @@ import { MoodPicker } from '@/src/components/MoodPicker';
 import { Paper } from '@/src/components/Paper';
 import { Screen } from '@/src/components/Screen';
 import { StickerLayer } from '@/src/components/StickerLayer';
+import { ReviewPrompt, useReviewMoment } from '@/src/components/ReviewPrompt';
 import { Button, Confirm } from '@/src/components/ui';
 import { type MoodId } from '@/src/data/moods';
 import { promptForDate } from '@/src/data/prompts';
@@ -94,6 +95,7 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
   const [celebrate, setCelebrate] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showThemes, setShowThemes] = useState(false);
+  const review = useReviewMoment();
   const prompt = promptForDate(draft.date);
   const streak = writingStreak(entries.map((entry) => entry.date));
   const buddy = getBuddy(settings.buddyId);
@@ -117,6 +119,8 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
         setCelebrate(true);
         setTimeout(() => setCelebrate(false), 3200);
       } else setToast('Saved on this device.');
+      const streakNow = writingStreak(useDiary.getState().entries.map((item) => item.date));
+      void review.consider('entry-saved', streakNow);
     }, 650);
     return () => clearTimeout(handle);
     // signature is the draft snapshot; upsertEntry is stable.
@@ -330,6 +334,15 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
           onConfirm={() => {
             deleteEntry(draft.id);
             router.back();
+          }}
+        />
+      ) : null}
+      {review.visible ? (
+        <ReviewPrompt
+          onClose={review.hide}
+          onFeedback={() => {
+            review.hide();
+            router.push('/feedback' as Href);
           }}
         />
       ) : null}

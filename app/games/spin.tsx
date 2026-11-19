@@ -1,9 +1,10 @@
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Animated, Easing, Pressable, Text, View } from 'react-native';
 import Svg, { G, Path, Text as SvgText } from 'react-native-svg';
 
 import { RewardCard } from '@/src/components/RewardCard';
+import { ReviewPrompt, useReviewMoment } from '@/src/components/ReviewPrompt';
 import { Screen } from '@/src/components/Screen';
 import { todayKey } from '@/src/logic/dates';
 import { SPIN_SEGMENTS, resolveReward, spinReward, type ResolvedReward } from '@/src/logic/rewards';
@@ -30,6 +31,7 @@ export default function SpinScreen() {
   const rotation = useRef(new Animated.Value(0)).current;
   const [spinning, setSpinning] = useState(false);
   const [reward, setReward] = useState<ResolvedReward | null>(null);
+  const review = useReviewMoment();
   const today = todayKey();
   const used = wallet.lastSpinDate === today;
   const slice = 360 / SPIN_SEGMENTS.length;
@@ -47,6 +49,7 @@ export default function SpinScreen() {
       markSpin(today);
       setReward(resolved);
       setSpinning(false);
+      void review.consider('game-won');
     });
   }
 
@@ -91,6 +94,15 @@ export default function SpinScreen() {
           <RewardCard reward={reward} onClose={() => router.back()} />
         </View>
       )}
+      {review.visible ? (
+        <ReviewPrompt
+          onClose={review.hide}
+          onFeedback={() => {
+            review.hide();
+            router.push('/feedback' as Href);
+          }}
+        />
+      ) : null}
     </Screen>
   );
 }

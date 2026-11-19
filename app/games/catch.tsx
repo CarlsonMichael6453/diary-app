@@ -1,8 +1,9 @@
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { RewardCard } from '@/src/components/RewardCard';
+import { ReviewPrompt, useReviewMoment } from '@/src/components/ReviewPrompt';
 import { Screen } from '@/src/components/Screen';
 import { todayKey } from '@/src/logic/dates';
 import { resolveReward, rewardForCatch, type ResolvedReward } from '@/src/logic/rewards';
@@ -30,6 +31,7 @@ export default function CatchScreen() {
   const walletRef = useRef(wallet);
   walletRef.current = wallet;
   const paid = useRef(false);
+  const review = useReviewMoment();
 
   function finish() {
     if (paid.current) return;
@@ -44,6 +46,7 @@ export default function CatchScreen() {
     grantReward(resolved, allowDrop ? 'catch' : undefined);
     setReward(resolved);
     setRunning(false);
+    if (scoreRef.current > 0) void review.consider('game-won');
   }
 
   useEffect(() => {
@@ -117,6 +120,15 @@ export default function CatchScreen() {
         <View style={{ marginTop: 12 }}>
           <RewardCard reward={reward} onClose={start} />
         </View>
+      ) : null}
+      {review.visible ? (
+        <ReviewPrompt
+          onClose={review.hide}
+          onFeedback={() => {
+            review.hide();
+            router.push('/feedback' as Href);
+          }}
+        />
       ) : null}
     </Screen>
   );

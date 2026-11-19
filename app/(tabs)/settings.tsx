@@ -52,6 +52,10 @@ export default function SettingsScreen() {
     <Screen>
       <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 36 }}>Settings</Text>
       <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, marginBottom: 12 }}>The book’s style, your pal, and the lock.</Text>
+      <Button label="Send feedback" onPress={() => router.push('/feedback' as Href)} />
+      <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, marginTop: 6, marginBottom: 16 }}>
+        A rating and a note. Your diary entries are never included.
+      </Text>
 
       <FieldLabel>Book title</FieldLabel>
       <TextInput value={settings.bookTitle} onChangeText={(bookTitle) => patchSettings({ bookTitle })} style={input(theme)} />

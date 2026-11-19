@@ -1,8 +1,9 @@
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { RewardCard } from '@/src/components/RewardCard';
+import { ReviewPrompt, useReviewMoment } from '@/src/components/ReviewPrompt';
 import { Screen } from '@/src/components/Screen';
 import { Button } from '@/src/components/ui';
 import { todayKey } from '@/src/logic/dates';
@@ -45,6 +46,7 @@ export default function MemoryScreen() {
   const walletRef = useRef(wallet);
   walletRef.current = wallet;
   const paid = useRef(false);
+  const review = useReviewMoment();
 
   function finish(finalMoves: number) {
     if (paid.current) return;
@@ -58,6 +60,7 @@ export default function MemoryScreen() {
     const resolved = resolveReward(rewardDraft, STICKERS, current.ownedStickerIds, current.ownedOutfitIds);
     grantReward(resolved, allowDrop ? 'memory' : undefined);
     setReward(resolved);
+    void review.consider('game-won');
   }
 
   const status = useMemo(() => `${moves} moves`, [moves]);
@@ -120,6 +123,15 @@ export default function MemoryScreen() {
           <Button label="Shuffle again" tone="ghost" onPress={() => { setDeck(makeDeck()); setOpen([]); setMatched([]); setMoves(0); }} />
         </View>
       )}
+      {review.visible ? (
+        <ReviewPrompt
+          onClose={review.hide}
+          onFeedback={() => {
+            review.hide();
+            router.push('/feedback' as Href);
+          }}
+        />
+      ) : null}
     </Screen>
   );
 }

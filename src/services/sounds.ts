@@ -2,7 +2,7 @@ import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-aud
 import { Platform } from 'react-native';
 
 import type { MoodId } from '../data/moods';
-import { OPEN_FAMILIES, type OpenFamily } from '../logic/bookOpen';
+import { STYLE_OPEN } from '../logic/bookOpen';
 import { BUDDY_SOUND_IDS, PAGE_SOUND_IDS, canPlaySound, pickPageSound } from '../logic/sound';
 import { useDiary } from '../store/useDiary';
 
@@ -80,6 +80,15 @@ export function primePageSounds(): void {
       player.pause();
     } catch {
       // The element is still created; a later gesture can unlock it.
+    }
+  }
+  for (const player of openPlayers.values()) {
+    player.volume = 0;
+    try {
+      player.play();
+      player.pause();
+    } catch {
+      // A later tap can still start the clip.
     }
   }
 }
@@ -186,27 +195,43 @@ export function playRouteTurn(): boolean {
 
 const plusSource = require('../../assets/sounds/plus/celebrate.wav');
 
-const openSources: Record<OpenFamily, number> = {
-  cozy: require('../../assets/sounds/open/cozy.wav'),
-  floral: require('../../assets/sounds/open/floral.wav'),
+const openSources: Record<string, number> = {
+  cutesy: require('../../assets/sounds/open/cutesy.wav'),
+  girlypop: require('../../assets/sounds/open/girlypop.wav'),
+  kawaii: require('../../assets/sounds/open/kawaii.wav'),
+  candy: require('../../assets/sounds/open/candy.wav'),
+  cottagecore: require('../../assets/sounds/open/cottagecore.wav'),
+  academia: require('../../assets/sounds/open/academia.wav'),
+  steampunk: require('../../assets/sounds/open/steampunk.wav'),
+  grunge: require('../../assets/sounds/open/grunge.wav'),
   ocean: require('../../assets/sounds/open/ocean.wav'),
   forest: require('../../assets/sounds/open/forest.wav'),
-  night: require('../../assets/sounds/open/night.wav'),
+  goth: require('../../assets/sounds/open/goth.wav'),
+  witchy: require('../../assets/sounds/open/witchy.wav'),
+  galaxy: require('../../assets/sounds/open/galaxy.wav'),
+  'galaxy-drift': require('../../assets/sounds/open/galaxy-drift.wav'),
+  minimal: require('../../assets/sounds/open/minimal.wav'),
+  aurora: require('../../assets/sounds/open/aurora.wav'),
+  'sparkle-rain': require('../../assets/sounds/open/sparkle-rain.wav'),
+  y2k: require('../../assets/sounds/open/y2k.wav'),
   retro: require('../../assets/sounds/open/retro.wav'),
-  elegant: require('../../assets/sounds/open/elegant.wav'),
-  christmas: require('../../assets/sounds/open/christmas.wav'),
-  halloween: require('../../assets/sounds/open/halloween.wav'),
-  valentine: require('../../assets/sounds/open/valentine.wav'),
-  festival: require('../../assets/sounds/open/festival.wav'),
+  vaporwave: require('../../assets/sounds/open/vaporwave.wav'),
+  psychedelic: require('../../assets/sounds/open/psychedelic.wav'),
+  neon: require('../../assets/sounds/open/neon.wav'),
+  'neon-glow': require('../../assets/sounds/open/neon-glow.wav'),
+  cyberpunk: require('../../assets/sounds/open/cyberpunk.wav'),
+  rainbow: require('../../assets/sounds/open/rainbow.wav'),
   sunset: require('../../assets/sounds/open/sunset.wav'),
+  'lava-lamp': require('../../assets/sounds/open/lava-lamp.wav'),
 };
 
-const openPlayers = new Map<OpenFamily, AudioPlayer>();
+const openPlayers = new Map<string, AudioPlayer>();
 
 function ensureOpenPool(): void {
-  for (const id of OPEN_FAMILIES) {
+  for (const id of Object.keys(STYLE_OPEN)) {
     if (openPlayers.has(id)) continue;
-    openPlayers.set(id, createAudioPlayer(openSources[id]));
+    const source = openSources[id];
+    if (source) openPlayers.set(id, createAudioPlayer(source));
   }
 }
 
@@ -214,11 +239,11 @@ ensurePagePool();
 ensureOpenPool();
 
 /** Opening the closed book. Not a page turn. Follows the master switch, volume, and the book-opening toggle. */
-export function playBookOpen(family: OpenFamily): boolean {
+export function playBookOpen(styleId: string): boolean {
   const prefs = useDiary.getState().settings;
   if (!prefs.soundEnabled || !(prefs.soundVolume > 0) || prefs.bookOpenMusic === false) return false;
   ensureOpenPool();
-  const player = openPlayers.get(family) ?? openPlayers.get('cozy');
+  const player = openPlayers.get(styleId) ?? openPlayers.get('cutesy');
   if (!player) return false;
   player.volume = Math.min(0.8, Math.max(0, prefs.soundVolume));
   try {
@@ -227,7 +252,7 @@ export function playBookOpen(family: OpenFamily): boolean {
     // Start from wherever the clip is if it has not seeked yet.
   }
   player.play();
-  if (typeof __DEV__ !== 'undefined' && __DEV__) console.log('[book-open] play', family);
+  if (typeof __DEV__ !== 'undefined' && __DEV__) console.log('[book-open] play', styleId);
   return true;
 }
 

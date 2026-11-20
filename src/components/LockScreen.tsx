@@ -4,7 +4,7 @@ import { Animated, AppState, Platform, Pressable, StyleSheet, Text, useWindowDim
 import { isShake, isWiggle, type MotionSample } from '../logic/motion';
 import { BookCover } from './BookCover';
 import { biometricAvailable, unlockWithBiometric } from '../services/biometrics';
-import { bookOpenFamily } from '../logic/bookOpen';
+import { bookOpenStyle } from '../logic/bookOpen';
 import { playBookOpen } from '../services/sounds';
 import { checkPasscode } from '../services/secure';
 import { useReduceMotion } from '../theme/useReduceMotion';
@@ -119,7 +119,7 @@ export function LockOverlay() {
   function openBook() {
     const settings = useDiary.getState().settings;
     const book = settings.books.find((item) => item.id === settings.activeBookId) ?? settings.books[0];
-    playBookOpen(bookOpenFamily({ themeId: book?.themeId ?? settings.themeId, design: book?.design }));
+    playBookOpen(bookOpenStyle({ themeId: book?.themeId ?? settings.themeId, design: book?.design }));
     const swingOpen = () => {
       if (reduceMotion) {
         finishOpen();

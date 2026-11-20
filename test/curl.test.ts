@@ -27,10 +27,10 @@ describe('soft curl', () => {
   it('rubber-bands a missing page and still commits a real fling', () => {
     assert.equal(releaseCurl('next', 0.5, 0, true), 'cancel');
     assert.equal(releaseCurl('prev', 0.8, 0, true), 'cancel');
-    assert.equal(releaseCurl('next', 0.4, 0, false), 'commit');
-    assert.equal(releaseCurl('next', 0.1, -1200, false), 'commit');
-    assert.equal(releaseCurl('prev', 0.1, 1200, false), 'commit');
-    assert.equal(releaseCurl('next', 0.5, 1200, false), 'cancel');
+    assert.equal(releaseCurl('next', 0.18, 0, false), 'commit');
+    assert.equal(releaseCurl('next', 0.1, -300, false), 'commit');
+    assert.equal(releaseCurl('prev', 0.1, 300, false), 'commit');
+    assert.equal(releaseCurl('next', 0.5, 300, false), 'commit');
     assert.equal(releaseCurl('next', 0.1, 0, false), 'cancel');
   });
 });

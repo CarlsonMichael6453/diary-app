@@ -1,30 +1,29 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { OPEN_FAMILIES, PACK_FAMILY, THEME_FAMILY, bookOpenFamily, familyForHue } from '../src/logic/bookOpen';
+import { COVER_MATERIALS, STYLE_OPEN, bookOpenStyle, everyStyleHasItsOwnOpenSound, styleForHue } from '../src/logic/bookOpen';
 import { THEMES } from '../src/theme/themes';
 
 describe('book opening music', () => {
-  it('gives every book style and seasonal pack a family, with 10 to 15 jingles', () => {
-    assert.ok(OPEN_FAMILIES.length >= 10 && OPEN_FAMILIES.length <= 15);
-    for (const theme of THEMES) {
-      assert.ok(OPEN_FAMILIES.includes(THEME_FAMILY[theme.id]), theme.id);
-    }
-    for (const family of Object.values(PACK_FAMILY)) {
-      assert.ok(OPEN_FAMILIES.includes(family));
-    }
-    assert.equal(PACK_FAMILY.christmas, 'christmas');
-    assert.equal(PACK_FAMILY.halloween, 'halloween');
-    assert.equal(PACK_FAMILY.valentines, 'valentine');
+  it('gives every book style its own clip and a cover material', () => {
+    assert.equal(everyStyleHasItsOwnOpenSound(), true);
+    assert.equal(Object.keys(STYLE_OPEN).length, THEMES.length);
+    const files = new Set(THEMES.map((theme) => theme.id));
+    assert.equal(files.size, THEMES.length);
+    for (const material of Object.values(STYLE_OPEN)) assert.ok(COVER_MATERIALS.includes(material));
+    assert.equal(STYLE_OPEN.goth, 'leather');
+    assert.equal(STYLE_OPEN.cottagecore, 'cloth');
+    assert.equal(STYLE_OPEN.cutesy, 'sparkle');
+    assert.equal(STYLE_OPEN.minimal, 'paper');
   });
 
-  it('lets a custom color design choose the jingle', () => {
-    assert.equal(bookOpenFamily({ themeId: 'forest' }), 'forest');
-    assert.equal(bookOpenFamily({ themeId: 'forest', design: { pattern: 'solid', colorA: '#1F8A9E', metal: 'gold' } }), 'elegant');
-    assert.equal(bookOpenFamily({ themeId: 'goth', design: { pattern: 'hearts', colorA: '#222222', metal: 'none' } }), 'floral');
-    assert.equal(bookOpenFamily({ themeId: 'cutesy', design: { pattern: 'stars', colorA: '#F4A3B8', metal: 'none' } }), 'night');
-    assert.equal(familyForHue('#1F8A9E'), 'ocean');
-    assert.equal(familyForHue('#7DCE82'), 'forest');
-    assert.equal(familyForHue('#F4A3B8'), 'floral');
+  it('plays that style, and lets a custom color pick a cover', () => {
+    assert.equal(bookOpenStyle({ themeId: 'forest' }), 'forest');
+    assert.equal(bookOpenStyle({ themeId: 'neon-glow' }), 'neon-glow');
+    assert.equal(bookOpenStyle({ themeId: 'forest', design: { pattern: 'solid', colorA: '#1F8A9E', metal: 'gold' } }), 'aurora');
+    assert.equal(bookOpenStyle({ themeId: 'goth', design: { pattern: 'hearts', colorA: '#222222', metal: 'none' } }), 'cutesy');
+    assert.equal(bookOpenStyle({ themeId: 'cutesy', design: { pattern: 'stars', colorA: '#F4A3B8', metal: 'none' } }), 'galaxy');
+    assert.equal(styleForHue('#1F8A9E'), 'ocean');
+    assert.equal(styleForHue('#7DCE82'), 'forest');
   });
 });

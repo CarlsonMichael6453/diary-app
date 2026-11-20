@@ -87,8 +87,24 @@ export const PageFlip = forwardRef<
 
   function commitSwipe(direction: 'next' | 'prev') {
     playCurlCommit();
-    side.value = 0;
     commitRef.current?.(direction);
+  }
+
+  const nativeFinish = useRef<(() => void) | null>(null);
+  function armNativeTurn(commit: boolean, direction: 'next' | 'prev') {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      side.value = 0;
+      fingerX.value = width.value || 1;
+      if (commit) commitSwipe(direction);
+    };
+    nativeFinish.current = finish;
+    setTimeout(finish, commit ? 460 : 340);
+  }
+  function finishNativeTurn() {
+    nativeFinish.current?.();
   }
 
   const arrived = useRef('');
@@ -180,27 +196,21 @@ export const PageFlip = forwardRef<
           fingerY.value = Math.max(0, Math.min(h, event.y));
           side.value = nextward ? -1 : 1;
         })
-        .onFinalize((event, success) => {
+        .onFinalize((event) => {
           'worklet';
           runOnJS(lock)(false);
           armed.value = 0;
-          if (!success || side.value === 0) return;
+          if (side.value === 0) return;
           const w = width.value || 1;
           const direction = side.value < 0 ? 'next' : 'prev';
           const reveal = direction === 'next' ? (w - fingerX.value) / w : fingerX.value / w;
           const blocked = direction === 'next' ? canNextSV.value < 1 : canPrevSV.value < 1;
           const decision = releaseCurl(direction, reveal, event.velocityX, blocked);
-          if (decision === 'commit') {
-            markHandoff();
-            const target = direction === 'next' ? 0 : w;
-            fingerX.value = withTiming(target, { duration: reduceSV.value ? 120 : 220, easing: Easing.out(Easing.cubic) }, (finished) => {
-              if (finished) runOnJS(commitSwipe)(direction);
-            });
-            return;
-          }
-          const rest = direction === 'next' ? w : 0;
-          fingerX.value = withSpring(rest, { damping: 20, stiffness: 280, mass: 0.5 }, (finished) => {
-            if (finished) side.value = 0;
+          const target = decision === 'commit' ? (direction === 'next' ? 0 : w) : direction === 'next' ? w : 0;
+          if (decision === 'commit') markHandoff();
+          runOnJS(armNativeTurn)(decision === 'commit', direction);
+          fingerX.value = withTiming(target, { duration: reduceSV.value ? 120 : 220, easing: Easing.out(Easing.cubic) }, (finished) => {
+            if (finished) runOnJS(finishNativeTurn)();
           });
         }),
     [armed, canNextSV, canPrevSV, editingSV, fingerX, fingerY, height, originX, originY, reduceSV, side, width],
@@ -216,7 +226,7 @@ export const PageFlip = forwardRef<
   const currentStyle = useAnimatedStyle(() => {
     const w = width.value || 1;
     const h = height.value || 1;
-    if (reduceSV.value || side.value !== -1) return { width: w };
+    if (reduceSV.value || side.value !== -1) return { width: w, clipPath: 'none' };
     const layout = curlLayout(fingerX.value, fingerY.value, w, h, 'next');
     if (Platform.OS !== 'web') return { width: Math.max(0, layout.foldX) };
     const slope = Math.tan((layout.angle * Math.PI) / 180);
@@ -231,7 +241,7 @@ export const PageFlip = forwardRef<
   const prevStyle = useAnimatedStyle(() => {
     const w = width.value || 1;
     const h = height.value || 1;
-    if (reduceSV.value || side.value !== 1) return { width: 0, opacity: 0 };
+    if (reduceSV.value || side.value !== 1) return { width: 0, opacity: 0, clipPath: 'none' };
     const layout = curlLayout(fingerX.value, fingerY.value, w, h, 'prev');
     if (Platform.OS !== 'web') return { opacity: 1, width: Math.max(0, layout.foldX) };
     const slope = Math.tan((layout.angle * Math.PI) / 180);
@@ -288,7 +298,8 @@ export const PageFlip = forwardRef<
 
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof window === 'undefined') return;
-    let drag: { x: number; y: number; left: number; top: number; active: boolean } | null = null;
+    let drag: { x: number; y: number; left: number; top: number; active: boolean; vx: number; lastX: number; lastT: number; startT: number } | null = null;
+    let settling = false;
     const inside = (event: PointerEvent) => {
       const node = document.getElementById('diary-page') ?? document.querySelector('[data-testid="diary-page"]');
       const rect = node?.getBoundingClientRect();
@@ -297,15 +308,15 @@ export const PageFlip = forwardRef<
       return rect;
     };
     const down = (event: PointerEvent) => {
-      if (editingRef.current || decorationDrag.value > 0) return;
+      if (settling || editingRef.current || decorationDrag.value > 0) return;
       const rect = inside(event);
       if (!rect) return;
-      drag = { x: event.clientX, y: event.clientY, left: rect.left, top: rect.top, active: false };
+      drag = { x: event.clientX, y: event.clientY, left: rect.left, top: rect.top, active: false, vx: 0, lastX: event.clientX, lastT: event.timeStamp, startT: event.timeStamp };
     };
-    const move = (event: PointerEvent) => {
+    const follow = (clientX: number, clientY: number, timeStamp: number) => {
       if (!drag || decorationDrag.value > 0) return;
-      const dx = event.clientX - drag.x;
-      const dy = event.clientY - drag.y;
+      const dx = clientX - drag.x;
+      const dy = clientY - drag.y;
       if (!drag.active) {
         if (Math.abs(dx) < 16 && Math.abs(dy) < 16) return;
         if (!(Math.abs(dx) > Math.abs(dy) + 8)) {
@@ -318,49 +329,106 @@ export const PageFlip = forwardRef<
         window.getSelection()?.removeAllRanges();
         (document.activeElement as HTMLElement | null)?.blur?.();
       }
-      event.preventDefault();
+      const dt = timeStamp - drag.lastT;
+      if (dt >= 12) {
+        const sample = ((clientX - drag.lastX) / dt) * 1000;
+        if (Math.abs(sample) > Math.abs(drag.vx)) drag.vx = sample;
+      }
+      drag.lastX = clientX;
+      drag.lastT = timeStamp;
       const w = width.value || 1;
       const h = height.value || 1;
       const nextward = dx <= 0;
       const blocked = nextward ? !edgeRef.current.canNext : !edgeRef.current.canPrev;
-      let fold = event.clientX - drag.left;
+      let fold = clientX - drag.left;
       if (blocked) {
         const pull = Math.max(-w * 0.28, Math.min(w * 0.28, dx * 0.32));
         fold = nextward ? w + Math.min(0, pull) : Math.max(0, pull);
       }
       fingerX.value = Math.max(0, Math.min(w, fold));
-      fingerY.value = Math.max(0, Math.min(h, event.clientY - drag.top));
+      fingerY.value = Math.max(0, Math.min(h, clientY - drag.top));
       side.value = nextward ? -1 : 1;
+    };
+    const move = (event: PointerEvent) => {
+      if (!drag) return;
+      if (drag.active && event.cancelable) event.preventDefault();
+      follow(event.clientX, event.clientY, event.timeStamp);
+    };
+    const touchMove = (event: TouchEvent) => {
+      const touch = event.touches[0];
+      if (!touch || !drag) return;
+      if (drag.active && event.cancelable) event.preventDefault();
+      follow(touch.clientX, touch.clientY, event.timeStamp);
+    };
+    const settle = (commit: boolean, direction: 'next' | 'prev') => {
+      if (settling) return;
+      settling = true;
+      const w = width.value || 1;
+      const target = commit ? (direction === 'next' ? 0 : w) : direction === 'next' ? w : 0;
+      let finishedOnce = false;
+      const complete = () => {
+        if (finishedOnce) return;
+        finishedOnce = true;
+        settling = false;
+        side.value = 0;
+        fingerX.value = w;
+        if (commit) commitSwipe(direction);
+      };
+      if (commit) markHandoff();
+      fingerX.value = withTiming(target, { duration: commit ? 240 : 180, easing: Easing.out(Easing.cubic) }, () => {
+        runOnJS(complete)();
+      });
+      window.setTimeout(complete, commit ? 420 : 320);
     };
     const up = (event: PointerEvent) => {
       const current = drag;
       drag = null;
       document.body.style.userSelect = '';
-      if (!current?.active) return;
-      lock(false);
+      if (!current || settling) return;
       const w = width.value || 1;
-      const direction = side.value < 0 ? 'next' : 'prev';
-      const reveal = direction === 'next' ? (w - fingerX.value) / w : fingerX.value / w;
-      const blocked = direction === 'next' ? !edgeRef.current.canNext : !edgeRef.current.canPrev;
-      const velocity = (event.clientX - current.x) * 6;
-      if (releaseCurl(direction, reveal, velocity, blocked) === 'commit') {
-        markHandoff();
-        fingerX.value = withTiming(direction === 'next' ? 0 : w, { duration: 220, easing: Easing.out(Easing.cubic) }, (finished) => {
-          if (finished) runOnJS(commitSwipe)(direction);
-        });
+      if (!current.active) {
+        const localX = event.clientX - current.left;
+        const target = event.target as HTMLElement | null;
+        const interactive = target?.closest?.('button, a, input, textarea');
+        if (!interactive && Math.abs(event.clientX - current.x) < 14 && Math.abs(event.clientY - current.y) < 14) {
+          if (localX > w * 0.82 && edgeRef.current.canNext) settle(true, 'next');
+          else if (localX < w * 0.18 && edgeRef.current.canPrev) settle(true, 'prev');
+        }
         return;
       }
-      fingerX.value = withSpring(direction === 'next' ? w : 0, { damping: 20, stiffness: 280, mass: 0.5 }, (finished) => {
-        if (finished) side.value = 0;
-      });
+      lock(false);
+      const liftedX = Math.abs(event.clientX - current.lastX) <= 36 ? event.clientX : current.lastX;
+      const net = liftedX - current.x;
+      const elapsed = Math.max(16, current.lastT - current.startT);
+      const average = (net / elapsed) * 1000;
+      const velocity = Math.sign(current.vx) === Math.sign(net) && Math.abs(current.vx) > Math.abs(average) ? current.vx : average;
+      const direction = net <= 0 ? 'next' : 'prev';
+      const reveal = Math.abs(net) / w;
+      const blocked = direction === 'next' ? !edgeRef.current.canNext : !edgeRef.current.canPrev;
+      side.value = direction === 'next' ? -1 : 1;
+      settle(releaseCurl(direction, reveal, velocity, blocked) === 'commit', direction);
     };
+    const fromTouch = (event: TouchEvent) => {
+      const touch = event.changedTouches[0];
+      up(new PointerEvent('pointerup', { clientX: touch?.clientX ?? drag?.lastX ?? 0, clientY: touch?.clientY ?? drag?.y ?? 0 }));
+    };
+    const pageNode = document.getElementById('diary-page');
+    if (pageNode) pageNode.style.touchAction = 'pan-y';
     window.addEventListener('pointerdown', down, true);
-    window.addEventListener('pointermove', move, true);
+    window.addEventListener('pointermove', move, { capture: true, passive: false });
     window.addEventListener('pointerup', up, true);
+    window.addEventListener('pointercancel', up, true);
+    window.addEventListener('touchmove', touchMove, { capture: true, passive: false });
+    window.addEventListener('touchend', fromTouch, true);
+    window.addEventListener('touchcancel', fromTouch, true);
     return () => {
       window.removeEventListener('pointerdown', down, true);
       window.removeEventListener('pointermove', move, true);
       window.removeEventListener('pointerup', up, true);
+      window.removeEventListener('pointercancel', up, true);
+      window.removeEventListener('touchmove', touchMove, true);
+      window.removeEventListener('touchend', fromTouch, true);
+      window.removeEventListener('touchcancel', fromTouch, true);
     };
   }, [fingerX, fingerY, side, width, height]);
 

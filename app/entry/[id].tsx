@@ -28,7 +28,7 @@ import { useDiary } from '@/src/store/useDiary';
 import { PACKS, stickersInPack } from '@/src/stickers/catalog';
 import { StickerView } from '@/src/stickers/StickerView';
 import { ThemeOverride, useTheme } from '@/src/theme/BookTheme';
-import { applyDesign, type ColorDesign } from '@/src/theme/designs';
+import { resolveEntryLook, type ColorDesign } from '@/src/theme/designs';
 import { THEMES, getTheme, type ThemeId } from '@/src/theme/themes';
 
 type Draft = {
@@ -84,26 +84,32 @@ export default function EntryScreen() {
   const routeId = String(params.id ?? 'new');
   const bookThemeId = useDiary((state) => state.settings.themeId);
   const premium = useDiary((state) => state.wallet.premium);
-  const bookDesign = useDiary((state) => state.settings.books.find((book) => book.id === state.settings.activeBookId)?.design);
+  const books = useDiary((state) => state.settings.books);
   const ticket = useDiary((state) => state.pageDesignTicket);
   const existing = useDiary((state) => state.entries.find((entry) => entry.id === routeId));
   const [draft, setDraft] = useState<Draft | null>(null);
-  const seenTicket = useRef(ticket?.token ?? 0);
+  const seenTicket = useRef(0);
 
   useEffect(() => {
-    if (!ticket || ticket.token === seenTicket.current) return;
+    if (!ticket || !draft || ticket.entryId !== draft.id || ticket.token === seenTicket.current) return;
     seenTicket.current = ticket.token;
     setDraft((current) => (current ? { ...current, design: ticket.design ?? undefined } : current));
-  }, [ticket]);
+  }, [ticket, draft]);
 
   useEffect(() => {
     if (draft) return;
-    if (routeId !== 'new' && existing) setDraft(fromEntry(existing));
-    else setDraft(blank(typeof params.date === 'string' ? params.date : todayKey(), useDiary.getState().settings.activeBookId));
+    const next = routeId !== 'new' && existing ? fromEntry(existing) : blank(typeof params.date === 'string' ? params.date : todayKey(), useDiary.getState().settings.activeBookId);
+    const pending = useDiary.getState().pageDesignTicket;
+    if (pending && pending.entryId === next.id) {
+      seenTicket.current = pending.token;
+      next.design = pending.design ?? undefined;
+    }
+    setDraft(next);
   }, [draft, existing, params.date, routeId]);
 
   if (!draft) return null;
-  const pageTheme = applyDesign(getTheme(draft.themeOverride ?? bookThemeId), draft.design === undefined ? bookDesign : draft.design, premium);
+  const entryBook = books.find((book) => book.id === (draft.bookId ?? useDiary.getState().settings.activeBookId)) ?? books[0];
+  const pageTheme = resolveEntryLook(entryBook ?? { themeId: bookThemeId }, draft, premium);
   return (
     <ThemeOverride theme={pageTheme}>
       <Editor draft={draft} setDraft={setDraft} />
@@ -139,16 +145,23 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
 
   const signature = useMemo(() => JSON.stringify(draft), [draft]);
   const skipFirstSave = useRef(true);
+  const draftRef = useRef(draft);
+  const savedSig = useRef(signature);
+  draftRef.current = draft;
 
   useEffect(() => {
     if (skipFirstSave.current) {
       skipFirstSave.current = false;
+      savedSig.current = signature;
       return;
     }
-    const dirty = draft.title.trim() || draft.body.trim() || draft.photos.length > 0 || draft.stickers.length > 0;
-    if (!dirty) return;
+    if (!pageNeedsSave(draft)) {
+      savedSig.current = signature;
+      return;
+    }
     const handle = setTimeout(() => {
       const bonus = upsertEntry({ ...draft, updatedAt: Date.now(), sample: false });
+      savedSig.current = signature;
       if (bonus > 0) {
         setToast(`Saved. +${bonus} coins for writing.`);
         setCelebrate(true);
@@ -156,13 +169,30 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
       } else setToast('Saved on this device.');
       const streakNow = writingStreak(useDiary.getState().entries.map((item) => item.date));
       void review.consider('entry-saved', streakNow);
-    }, 650);
+    }, 400);
     return () => clearTimeout(handle);
+  }, [signature]);
+
+  useEffect(() => {
+    return () => {
+      const latest = draftRef.current;
+      const latestSig = JSON.stringify(latest);
+      if (latestSig === savedSig.current) return;
+      if (!pageNeedsSave(latest)) return;
+      upsertEntry({ ...latest, updatedAt: Date.now(), sample: false });
+    };
     // signature is the draft snapshot; upsertEntry is stable.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature]);
 
-  function updateSticker(next: StickerPlacement) {
+  function pageNeedsSave(latest: Draft): boolean {
+  const content = latest.title.trim() || latest.body.trim() || latest.photos.length > 0 || latest.stickers.length > 0 || latest.themeOverride || latest.design;
+  const stored = useDiary.getState().entries.find((entry) => entry.id === latest.id);
+  const lookChanged = Boolean(stored) && ((stored?.themeOverride ?? null) !== (latest.themeOverride ?? null) || JSON.stringify(stored?.design ?? null) !== JSON.stringify(latest.design ?? null));
+  return Boolean(content || lookChanged);
+}
+
+function updateSticker(next: StickerPlacement) {
     setDraft({ ...draft, stickers: draft.stickers.map((item) => (item.id === next.id ? next : item)) });
   }
 
@@ -281,16 +311,28 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
           </Paper>
         </View>
         {showThemes ? (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 12 }}>
-            <Pressable onPress={() => setDraft({ ...draft, themeOverride: null })} style={{ padding: 10, borderRadius: 12, backgroundColor: draft.themeOverride ? theme.colors.chip : theme.colors.accent }}>
-              <Text style={{ color: draft.themeOverride ? theme.colors.chipInk : theme.colors.onAccent, fontFamily: theme.body }}>Match the book</Text>
-            </Pressable>
-            {THEMES.map((item) => (
-              <Pressable key={item.id} onPress={() => { if (item.premium && !wallet.premium) { router.push('/paywall' as Href); return; } setDraft({ ...draft, themeOverride: item.id }); }} style={{ padding: 10, borderRadius: 12, backgroundColor: item.colors.paper, borderWidth: draft.themeOverride === item.id ? 2 : 0, borderColor: item.colors.accent, opacity: item.premium && !wallet.premium ? 0.55 : 1 }}>
-                <Text style={{ color: item.colors.paperInk, fontFamily: item.body }}>{item.emoji} {item.name}{item.premium ? ' · Plus' : ''}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
+          <View style={{ paddingVertical: 8, gap: 8 }}>
+            <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 22 }}>Page theme</Text>
+            <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>
+              {draft.themeOverride || draft.design ? 'This page keeps its own look. Other pages still follow the book.' : 'This page uses the book design. A choice here stays on this page only.'}
+            </Text>
+            <Button label="Use book design" tone={draft.themeOverride || draft.design ? 'primary' : 'ghost'} onPress={() => setDraft({ ...draft, themeOverride: null, design: undefined })} />
+            <Button
+              label={draft.design ? 'This page has its own colors' : 'Custom colors for this page'}
+              tone="ghost"
+              onPress={() => {
+                useDiary.getState().rememberPageDesign(draft.design ?? null);
+                router.push(`/color-designer?target=page&entry=${draft.id}` as Href);
+              }}
+            />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+              {THEMES.map((item) => (
+                <Pressable key={item.id} onPress={() => { if (item.premium && !wallet.premium) { router.push('/paywall' as Href); return; } setDraft({ ...draft, themeOverride: item.id }); }} style={{ padding: 10, borderRadius: 12, backgroundColor: item.colors.paper, borderWidth: draft.themeOverride === item.id ? 2 : 0, borderColor: item.colors.accent, opacity: item.premium && !wallet.premium ? 0.55 : 1 }}>
+                  <Text style={{ color: item.colors.paperInk, fontFamily: item.body }}>{item.emoji} {item.name}{item.premium ? ' · Plus' : ''}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
         ) : null}
       </ScrollView>
 
@@ -360,15 +402,7 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
       ) : (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 12, paddingBottom: Math.max(insets.bottom, 12) }}>
           <Button label="Decorate" onPress={() => setDecorate(true)} style={{ flex: 1 }} />
-          <Button label={draft.themeOverride ? `${getTheme(draft.themeOverride).name} page` : 'Page style'} tone="ghost" onPress={() => setShowThemes((value) => !value)} style={{ flex: 1 }} />
-          <Button
-            label="Colors"
-            tone="ghost"
-            onPress={() => {
-              useDiary.getState().rememberPageDesign(draft.design ?? null);
-              router.push('/color-designer?target=page' as Href);
-            }}
-          />
+          <Button label={draft.themeOverride || draft.design ? 'Page theme · custom' : 'Page theme'} tone={showThemes ? 'primary' : 'ghost'} onPress={() => setShowThemes((value) => !value)} style={{ flex: 1 }} />
           <Button label="Pal" tone="ghost" onPress={() => router.push('/buddies' as Href)} />
         </View>
       )}

@@ -1,4 +1,4 @@
-import { isDarkHex, type Theme } from './themes';
+import { getTheme, isDarkHex, type Theme } from './themes';
 
 export type PaintedTheme = Theme & { design: ColorDesign | null };
 
@@ -173,6 +173,33 @@ export function hslToHex(h: number, s: number, l: number): string {
 export function contrastInk(hex: string): { ink: string; soft: string; onAccent: string } {
   if (isDarkHex(swatchHex(hex))) return { ink: '#F7F1E8', soft: '#E4D3C4', onAccent: '#2A211C' };
   return { ink: '#3A2A32', soft: '#6E5862', onAccent: '#3A2A32' };
+}
+
+export function sanitizeDesign(value: unknown): ColorDesign | null {
+  if (!value || typeof value !== 'object') return null;
+  const design = value as Partial<ColorDesign>;
+  if (!design.pattern || !PATTERN_IDS.includes(design.pattern)) return null;
+  if (!design.motion || !MOTION_IDS.includes(design.motion)) return null;
+  if (!design.metal || !METAL_IDS.includes(design.metal)) return null;
+  if (!design.colorA || !isUsableColor(design.colorA) || !design.colorB || !isUsableColor(design.colorB)) return null;
+  return { pattern: design.pattern, colorA: design.colorA, colorB: design.colorB, motion: design.motion, metal: design.metal };
+}
+
+function isUsableColor(value: string): boolean {
+  return isHexColor(value) || isMetalSwatch(value);
+}
+
+/** A page with no design of its own wears the book's design. A saved page design stays put when the book changes. */
+export function inheritedDesign(bookDesign: ColorDesign | null | undefined, pageDesign: ColorDesign | null | undefined): ColorDesign | null {
+  return sanitizeDesign(pageDesign) ?? sanitizeDesign(bookDesign);
+}
+
+export function resolveEntryLook(
+  book: { themeId: string; design?: ColorDesign | null },
+  entry: { themeOverride?: string | null; design?: ColorDesign | null },
+  premium: boolean,
+): PaintedTheme {
+  return applyDesign(getTheme(entry.themeOverride || book.themeId), inheritedDesign(book.design, entry.design), premium);
 }
 
 export function applyDesign(theme: Theme, design: ColorDesign | null | undefined, premium: boolean): PaintedTheme {

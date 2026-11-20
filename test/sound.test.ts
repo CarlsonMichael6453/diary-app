@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { BUDDY_SOUND_IDS, PAGE_SOUND_IDS, canPlaySound, pickPageSound, type SoundPrefs } from '../src/logic/sound';
+import { claimHorizontalSwipe, releaseSwipe } from '../src/logic/swipe';
 
 const on: SoundPrefs = { soundEnabled: true, buddySounds: true, pageSounds: true, soundVolume: 0.7 };
 
@@ -12,7 +13,10 @@ describe('sounds', () => {
     for (const id of ['mochi', 'batsy', 'sprout', 'glitter', 'prism', 'inky', 'pip', 'nova', 'shelly', 'ghosty', 'ember', 'lumi']) {
       assert.ok(BUDDY_SOUND_IDS.includes(id as (typeof BUDDY_SOUND_IDS)[number]), id);
     }
-    assert.ok(PAGE_SOUND_IDS.length >= 5);
+    assert.deepEqual(
+      [...PAGE_SOUND_IDS],
+      ['real-1-slow-journal', 'real-2-journal-rustle', 'real-4-book-page-turn', 'real-5-book-page-flip', 'real-6-heavy-sketchbook'],
+    );
   });
 
   it('respects the master switch, each channel, and a zero volume', () => {
@@ -35,5 +39,16 @@ describe('sounds', () => {
       previous = next;
     }
     assert.equal(pickPageSound(['only'], 'only', () => 0), 'only');
+  });
+
+  it('locks a sideways swipe and leaves typing and vertical drags alone', () => {
+    assert.equal(claimHorizontalSwipe(40, 4, false), true);
+    assert.equal(claimHorizontalSwipe(-30, 6, false), true);
+    assert.equal(claimHorizontalSwipe(8, 2, false), false);
+    assert.equal(claimHorizontalSwipe(10, 40, false), false);
+    assert.equal(claimHorizontalSwipe(40, 4, true), false);
+    assert.equal(releaseSwipe(-0.4), 'next');
+    assert.equal(releaseSwipe(0.3), 'prev');
+    assert.equal(releaseSwipe(0.1), 'cancel');
   });
 });

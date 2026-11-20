@@ -107,20 +107,8 @@ const buddies = {
   lumi: concat([tone(784, 0.14, { partial: 0.15, amp: 0.3, release: 0.1 }), silence(0.02), tone(1175, 0.18, { amp: 0.22, release: 0.12 })]),
 };
 
-const pages = [
-  noise(0.28, { color: 0.72, crack: 0.03, amp: 0.55 }),
-  noise(0.42, { color: 0.9, crack: 0.012, amp: 0.4, release: 0.16 }),
-  concat([noise(0.12, { color: 0.6, crack: 0.05, amp: 0.6 }), silence(0.03), noise(0.18, { color: 0.8, crack: 0.02, amp: 0.35 })]),
-  noise(0.22, { color: 0.5, crack: 0.04, amp: 0.5, attack: 0.004, release: 0.05 }),
-  concat([noise(0.08, { color: 0.95, crack: 0.008, amp: 0.3 }), noise(0.3, { color: 0.78, crack: 0.025, amp: 0.45, attack: 0.04 })]),
-  noise(0.36, { color: 0.66, crack: 0.018, amp: 0.48, attack: 0.02, release: 0.14 }),
-];
-
 for (const [id, samples] of Object.entries(buddies)) {
   writeWav(join(root, 'buddies', `${id}.wav`), samples);
 }
-pages.forEach((samples, index) => {
-  writeWav(join(root, 'pages', `flip-${index + 1}.wav`), samples);
-});
 
-console.log(`wrote ${Object.keys(buddies).length} buddy sounds and ${pages.length} page turns`);
+console.log(`wrote ${Object.keys(buddies).length} buddy sounds`);

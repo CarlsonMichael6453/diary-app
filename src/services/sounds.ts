@@ -19,12 +19,11 @@ const buddySources: Record<(typeof BUDDY_SOUND_IDS)[number], number> = {
 };
 
 const pageSources: Record<(typeof PAGE_SOUND_IDS)[number], number> = {
-  'flip-1': require('../../assets/sounds/pages/flip-1.wav'),
-  'flip-2': require('../../assets/sounds/pages/flip-2.wav'),
-  'flip-3': require('../../assets/sounds/pages/flip-3.wav'),
-  'flip-4': require('../../assets/sounds/pages/flip-4.wav'),
-  'flip-5': require('../../assets/sounds/pages/flip-5.wav'),
-  'flip-6': require('../../assets/sounds/pages/flip-6.wav'),
+  'real-1-slow-journal': require('../../assets/sounds/pageturn/real-1-slow-journal.mp3'),
+  'real-2-journal-rustle': require('../../assets/sounds/pageturn/real-2-journal-rustle.mp3'),
+  'real-4-book-page-turn': require('../../assets/sounds/pageturn/real-4-book-page-turn.mp3'),
+  'real-5-book-page-flip': require('../../assets/sounds/pageturn/real-5-book-page-flip.mp3'),
+  'real-6-heavy-sketchbook': require('../../assets/sounds/pageturn/real-6-heavy-sketchbook.mp3'),
 };
 
 const players = new Map<string, AudioPlayer>();

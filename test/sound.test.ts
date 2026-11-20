@@ -13,10 +13,13 @@ describe('sounds', () => {
     for (const id of ['mochi', 'batsy', 'sprout', 'glitter', 'prism', 'inky', 'pip', 'nova', 'shelly', 'ghosty', 'ember', 'lumi']) {
       assert.ok(BUDDY_SOUND_IDS.includes(id as (typeof BUDDY_SOUND_IDS)[number]), id);
     }
-    assert.deepEqual(
-      [...PAGE_SOUND_IDS],
-      ['real-1-slow-journal', 'real-2-journal-rustle', 'real-4-book-page-turn', 'real-5-book-page-flip', 'real-6-heavy-sketchbook'],
-    );
+    assert.equal(PAGE_SOUND_IDS.length, 15);
+    assert.equal(new Set(PAGE_SOUND_IDS).size, 15);
+    for (const stem of ['real-1-slow-journal', 'real-2-journal-rustle', 'real-4-book-page-turn', 'real-5-book-page-flip', 'real-6-heavy-sketchbook']) {
+      for (const suffix of ['', '-faster', '-slower']) {
+        assert.ok(PAGE_SOUND_IDS.includes(`${stem}${suffix}` as (typeof PAGE_SOUND_IDS)[number]), `${stem}${suffix}`);
+      }
+    }
   });
 
   it('respects the master switch, each channel, and a zero volume', () => {

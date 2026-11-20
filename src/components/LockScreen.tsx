@@ -4,7 +4,8 @@ import { Animated, AppState, Platform, Pressable, StyleSheet, Text, useWindowDim
 import { isShake, isWiggle, type MotionSample } from '../logic/motion';
 import { BookCover } from './BookCover';
 import { biometricAvailable, unlockWithBiometric } from '../services/biometrics';
-import { playPageTurn } from '../services/sounds';
+import { bookOpenFamily } from '../logic/bookOpen';
+import { playBookOpen } from '../services/sounds';
 import { checkPasscode } from '../services/secure';
 import { useReduceMotion } from '../theme/useReduceMotion';
 import { useTheme } from '../theme/BookTheme';
@@ -96,6 +97,7 @@ export function LockOverlay() {
   const screen = useWindowDimensions();
   const coverWidth = Math.round(Math.min(screen.width - 48, (screen.height - 230) / 1.35, 300));
   const [open, setOpen] = useState(false);
+  const [unlatched, setUnlatched] = useState(false);
   const [bio, setBio] = useState(false);
   const swing = useRef(new Animated.Value(0)).current;
   const jiggle = useRef(new Animated.Value(0)).current;
@@ -106,6 +108,7 @@ export function LockOverlay() {
   function shut() {
     swing.setValue(0);
     setOpen(false);
+    setUnlatched(false);
     prompted.current = false;
   }
 
@@ -114,14 +117,24 @@ export function LockOverlay() {
   }
 
   function openBook() {
-    playPageTurn();
-    if (reduceMotion) {
-      finishOpen();
+    const settings = useDiary.getState().settings;
+    const book = settings.books.find((item) => item.id === settings.activeBookId) ?? settings.books[0];
+    playBookOpen(bookOpenFamily({ themeId: book?.themeId ?? settings.themeId, design: book?.design }));
+    const swingOpen = () => {
+      if (reduceMotion) {
+        finishOpen();
+        return;
+      }
+      Animated.timing(swing, { toValue: 1, duration: 560, useNativeDriver: true }).start(({ finished }) => {
+        if (finished) finishOpen();
+      });
+    };
+    if (lockEnabled) {
+      setUnlatched(true);
+      setTimeout(swingOpen, 180);
       return;
     }
-    Animated.timing(swing, { toValue: 1, duration: 560, useNativeDriver: true }).start(({ finished }) => {
-      if (finished) finishOpen();
-    });
+    swingOpen();
   }
 
   useEffect(() => {
@@ -220,7 +233,7 @@ export function LockOverlay() {
       }
     >
       <Animated.View style={coverStyle}>
-        <BookCover title={bookTitle} theme={theme} width={coverWidth} />
+        <BookCover title={bookTitle} theme={theme} width={coverWidth} locked={lockEnabled} unlatched={unlatched} />
       </Animated.View>
       {lockOnOpen && lockEnabled ? (
         <View style={{ marginTop: 18, width: '100%' }}>

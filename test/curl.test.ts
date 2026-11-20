@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { CURL_DIAMETER, curlLayout, foldAngle } from '../src/logic/curl';
+import { CURL_FOLD, curlLayout, foldAngle } from '../src/logic/curl';
 import { releaseCurl } from '../src/logic/swipe';
 
 describe('soft curl', () => {
@@ -11,7 +11,7 @@ describe('soft curl', () => {
     assert.equal(layout.side, 'next');
     assert.equal(layout.coverLeft, 120);
     assert.ok(Math.abs(layout.curlLeft + layout.curlWidth * 0.35 - 120) < 1);
-    assert.equal(layout.curlWidth, 400 * CURL_DIAMETER);
+    assert.equal(layout.curlWidth, CURL_FOLD);
     const back = curlLayout(250, 200, 400, 640, 'prev');
     assert.equal(back.foldX, 250);
     assert.equal(back.coverWidth, 250);

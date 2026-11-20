@@ -96,6 +96,7 @@ export function defaultSettings(): Settings {
     soundEnabled: true,
     buddySounds: true,
     pageSounds: true,
+    bookOpenMusic: true,
     soundVolume: 0.7,
     lockOnOpen: true,
     books: [{ id: 'daily', title: 'Daily', themeId: 'cutesy' }],

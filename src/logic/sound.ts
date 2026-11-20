@@ -15,10 +15,20 @@ export const BUDDY_SOUND_IDS = [
 
 export const PAGE_SOUND_IDS = [
   'real-1-slow-journal',
+  'real-1-slow-journal-faster',
+  'real-1-slow-journal-slower',
   'real-2-journal-rustle',
+  'real-2-journal-rustle-faster',
+  'real-2-journal-rustle-slower',
   'real-4-book-page-turn',
+  'real-4-book-page-turn-faster',
+  'real-4-book-page-turn-slower',
   'real-5-book-page-flip',
+  'real-5-book-page-flip-faster',
+  'real-5-book-page-flip-slower',
   'real-6-heavy-sketchbook',
+  'real-6-heavy-sketchbook-faster',
+  'real-6-heavy-sketchbook-slower',
 ] as const;
 
 export type SoundKind = 'buddy' | 'page';

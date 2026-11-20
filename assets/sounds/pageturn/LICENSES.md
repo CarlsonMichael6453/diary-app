@@ -69,6 +69,14 @@ Processing applied to every file: 50 Hz high-pass, trim to one page turn (~0.7�
 
 ---
 
+## Speed-modified derivatives
+
+Each of the five clips shipped in this folder (`real-1-slow-journal`, `real-2-journal-rustle`, `real-4-book-page-turn`, `real-5-book-page-flip`, and `real-6-heavy-sketchbook`) also has a `-faster` and a `-slower` file. Those ten files are speed-modified derivatives of the CC0 recordings listed above. They are not separate recordings and they do not add a new license. The same CC0 dedication, source URL, and optional credit apply to each pair.
+
+`real-3-heavy-thick-paper.mp3` is described above for completeness. It is not included in the app.
+
+---
+
 ## Sources considered and not used
 
 - YouTube: “Page Turning Sound Effect - Flip Book Pages” by Free Audio Zone (https://youtu.be/DeFmzObtgPU) was used only as a written reference for the kind of sound wanted (close-mic, realistic, slow book-page flips). The YouTube audio was not downloaded or used. The public video description says the sound is for non-commercial personal projects only, and that publishing or hosting it on other channels or websites is not allowed. That does not allow use in a commercial mobile app.

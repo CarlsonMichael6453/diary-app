@@ -20,10 +20,20 @@ const buddySources: Record<(typeof BUDDY_SOUND_IDS)[number], number> = {
 
 const pageSources: Record<(typeof PAGE_SOUND_IDS)[number], number> = {
   'real-1-slow-journal': require('../../assets/sounds/pageturn/real-1-slow-journal.mp3'),
+  'real-1-slow-journal-faster': require('../../assets/sounds/pageturn/real-1-slow-journal-faster.mp3'),
+  'real-1-slow-journal-slower': require('../../assets/sounds/pageturn/real-1-slow-journal-slower.mp3'),
   'real-2-journal-rustle': require('../../assets/sounds/pageturn/real-2-journal-rustle.mp3'),
+  'real-2-journal-rustle-faster': require('../../assets/sounds/pageturn/real-2-journal-rustle-faster.mp3'),
+  'real-2-journal-rustle-slower': require('../../assets/sounds/pageturn/real-2-journal-rustle-slower.mp3'),
   'real-4-book-page-turn': require('../../assets/sounds/pageturn/real-4-book-page-turn.mp3'),
+  'real-4-book-page-turn-faster': require('../../assets/sounds/pageturn/real-4-book-page-turn-faster.mp3'),
+  'real-4-book-page-turn-slower': require('../../assets/sounds/pageturn/real-4-book-page-turn-slower.mp3'),
   'real-5-book-page-flip': require('../../assets/sounds/pageturn/real-5-book-page-flip.mp3'),
+  'real-5-book-page-flip-faster': require('../../assets/sounds/pageturn/real-5-book-page-flip-faster.mp3'),
+  'real-5-book-page-flip-slower': require('../../assets/sounds/pageturn/real-5-book-page-flip-slower.mp3'),
   'real-6-heavy-sketchbook': require('../../assets/sounds/pageturn/real-6-heavy-sketchbook.mp3'),
+  'real-6-heavy-sketchbook-faster': require('../../assets/sounds/pageturn/real-6-heavy-sketchbook-faster.mp3'),
+  'real-6-heavy-sketchbook-slower': require('../../assets/sounds/pageturn/real-6-heavy-sketchbook-slower.mp3'),
 };
 
 const players = new Map<string, AudioPlayer>();

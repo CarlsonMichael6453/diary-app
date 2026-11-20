@@ -13,6 +13,7 @@ import { birthdayFrom, isSeasonalPack, packOnSale, shopToday } from '../logic/se
 import { loginProgress } from '../logic/streak';
 import { writingStreak } from '../logic/streak';
 import type { DiaryEntry, Settings, Snapshot, Wallet } from '../models/types';
+import { restoreSavedDesigns } from '../logic/savedDesigns';
 import type { ColorDesign } from '../theme/designs';
 import { getProduct } from '../services/purchases';
 import { STICKERS, getPack, getSticker, stickersInPack } from '../stickers/catalog';
@@ -164,9 +165,9 @@ type DiaryStore = DiaryData & {
   markBackup: (iso: string) => void;
   setBookDesign: (design: ColorDesign | null) => void;
   rememberPageDesign: (design: ColorDesign | null) => void;
-  offerPageDesign: (design: ColorDesign | null) => void;
+  offerPageDesign: (entryId: string, design: ColorDesign | null) => void;
   pageDesignSeed: ColorDesign | null;
-  pageDesignTicket: { token: number; design: ColorDesign | null } | null;
+  pageDesignTicket: { token: number; entryId: string; design: ColorDesign | null } | null;
 };
 
 function asSnapshot(value: unknown): Snapshot | null {
@@ -345,13 +346,10 @@ export const useDiary = create<DiaryStore>()(
       importSnapshot: (raw) => {
         const snapshot = asSnapshot(raw);
         if (!snapshot) return { ok: false, message: 'That file is not a Diary App backup.' };
+        const restored = restoreSavedDesigns(snapshot.settings, snapshot.entries, snapshot.books ?? snapshot.settings.books);
         set({
-          settings: {
-            ...defaultSettings(),
-            ...snapshot.settings,
-            books: snapshot.books ?? snapshot.settings.books ?? defaultSettings().books,
-          },
-          entries: snapshot.entries,
+          settings: { ...defaultSettings(), ...restored.settings },
+          entries: restored.entries,
           wallet: { ...defaultWallet(), ...snapshot.wallet },
         });
         return { ok: true, message: 'Backup restored on this device.' };
@@ -379,7 +377,13 @@ export const useDiary = create<DiaryStore>()(
           },
         })),
       rememberPageDesign: (design) => set({ pageDesignSeed: design }),
-      offerPageDesign: (design) => set({ pageDesignTicket: { token: Date.now(), design } }),
+      offerPageDesign: (entryId, design) =>
+        set((state) => ({
+          pageDesignTicket: { token: Date.now(), entryId, design },
+          entries: state.entries.some((entry) => entry.id === entryId)
+            ? state.entries.map((entry) => (entry.id === entryId ? { ...entry, design: design ?? undefined, updatedAt: Date.now() } : entry))
+            : state.entries,
+        })),
       snapshot: () => {
         const { settings, entries, wallet } = get();
         return { version: 2, exportedAt: new Date().toISOString(), settings, entries, wallet, books: settings.books };

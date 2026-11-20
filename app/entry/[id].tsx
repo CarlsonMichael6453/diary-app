@@ -1,12 +1,14 @@
 import { router, useLocalSearchParams, type Href } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Image, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { BackHandler, Image, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BuddyView } from '@/src/buddies/BuddyView';
 import { getBuddy } from '@/src/buddies/catalog';
 import { EntryExtras } from '@/src/components/EntryExtras';
 import { MoodPicker } from '@/src/components/MoodPicker';
+import { FontFields } from '@/src/components/FontFields';
+import { PageFlip } from '@/src/components/PageFlip';
 import { Paper } from '@/src/components/Paper';
 import { Screen } from '@/src/components/Screen';
 import { StickerLayer } from '@/src/components/StickerLayer';
@@ -29,6 +31,7 @@ import { PACKS, stickersInPack } from '@/src/stickers/catalog';
 import { StickerView } from '@/src/stickers/StickerView';
 import { ThemeOverride, useTheme } from '@/src/theme/BookTheme';
 import { resolveEntryLook, type ColorDesign } from '@/src/theme/designs';
+import { applyType, FONT_CHOICES, INK_SWATCHES, sanitizeInk } from '@/src/theme/fonts';
 import { THEMES, getTheme, type ThemeId } from '@/src/theme/themes';
 
 type Draft = {
@@ -41,6 +44,8 @@ type Draft = {
   stickers: StickerPlacement[];
   themeOverride: ThemeId | null;
   design?: ColorDesign | null;
+  fontId?: string | null;
+  inkColor?: string | null;
   createdAt: number;
   bookId?: string;
   tags?: string[];
@@ -67,6 +72,8 @@ function fromEntry(entry: DiaryEntry): Draft {
     stickers: entry.stickers,
     themeOverride: entry.themeOverride,
     design: entry.design,
+    fontId: entry.fontId,
+    inkColor: entry.inkColor,
     createdAt: entry.createdAt,
     bookId: entry.bookId,
     tags: entry.tags ?? [],
@@ -89,6 +96,13 @@ export default function EntryScreen() {
   const existing = useDiary((state) => state.entries.find((entry) => entry.id === routeId));
   const [draft, setDraft] = useState<Draft | null>(null);
   const seenTicket = useRef(0);
+  const routeSeen = useRef(routeId);
+
+  useEffect(() => {
+    if (routeSeen.current === routeId) return;
+    routeSeen.current = routeId;
+    setDraft(null);
+  }, [routeId]);
 
   useEffect(() => {
     if (!ticket || !draft || ticket.entryId !== draft.id || ticket.token === seenTicket.current) return;
@@ -109,7 +123,11 @@ export default function EntryScreen() {
 
   if (!draft) return null;
   const entryBook = books.find((book) => book.id === (draft.bookId ?? useDiary.getState().settings.activeBookId)) ?? books[0];
-  const pageTheme = resolveEntryLook(entryBook ?? { themeId: bookThemeId }, draft, premium);
+  const pageTheme = applyType(
+    resolveEntryLook(entryBook ?? { themeId: bookThemeId }, draft, premium),
+    draft.fontId ?? entryBook?.fontId,
+    draft.inkColor ?? entryBook?.inkColor,
+  );
   return (
     <ThemeOverride theme={pageTheme}>
       <Editor draft={draft} setDraft={setDraft} />
@@ -134,6 +152,7 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
   const [celebrate, setCelebrate] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showThemes, setShowThemes] = useState(false);
+  const leaving = useRef(false);
   const review = useReviewMoment();
   const prompt = promptForDate(draft.date);
   const listedPacks = PACKS.filter((pack) => packIsListed(pack, wallet.ownedPackIds, shopToday(settings.debugDate), birthdayFrom(settings.birthdayMonth, settings.birthdayDay)));
@@ -185,10 +204,41 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature]);
 
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      goBack();
+      return true;
+    });
+    return () => sub.remove();
+  }, [draft.id]);
+
+  function goBack() {
+    if (leaving.current) return;
+    leaving.current = true;
+    void playPageTurn();
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
+  }
+
+  function stepEntry(delta: number) {
+    const bookId = draft.bookId ?? settings.activeBookId;
+    const ordered = entries
+      .filter((entry) => (entry.bookId ?? 'daily') === bookId)
+      .sort((a, b) => a.date.localeCompare(b.date) || a.createdAt - b.createdAt);
+    const index = ordered.findIndex((entry) => entry.id === draft.id);
+    const neighbor = ordered[index + delta];
+    if (neighbor) {
+      router.replace(`/entry/${neighbor.id}` as Href);
+      return;
+    }
+    setDraft({ ...draft, date: addDays(draft.date, delta) });
+  }
+
   function pageNeedsSave(latest: Draft): boolean {
-  const content = latest.title.trim() || latest.body.trim() || latest.photos.length > 0 || latest.stickers.length > 0 || latest.themeOverride || latest.design;
+  const content = latest.title.trim() || latest.body.trim() || latest.photos.length > 0 || latest.stickers.length > 0 || latest.themeOverride || latest.design || latest.fontId || latest.inkColor;
   const stored = useDiary.getState().entries.find((entry) => entry.id === latest.id);
-  const lookChanged = Boolean(stored) && ((stored?.themeOverride ?? null) !== (latest.themeOverride ?? null) || JSON.stringify(stored?.design ?? null) !== JSON.stringify(latest.design ?? null));
+  const lookChanged = Boolean(stored) && ((stored?.themeOverride ?? null) !== (latest.themeOverride ?? null) || JSON.stringify(stored?.design ?? null) !== JSON.stringify(latest.design ?? null) || (stored?.fontId ?? null) !== (latest.fontId ?? null) || (stored?.inkColor ?? null) !== (latest.inkColor ?? null));
   return Boolean(content || lookChanged);
 }
 
@@ -205,20 +255,22 @@ function updateSticker(next: StickerPlacement) {
   };
 
   return (
-    <Screen scroll={false} padded={false} style={{ flex: 1, paddingTop: insets.top }}>
+    <Screen nav={false} scroll={false} padded={false} style={{ flex: 1, paddingTop: insets.top }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingBottom: 8 }}>
-        <Pressable onPress={() => router.back()} accessibilityLabel="Back"><Text style={{ color: theme.colors.ink, fontFamily: theme.body, fontSize: 16 }}>Back</Text></Pressable>
+        <Pressable onPress={goBack} accessibilityLabel="Back"><Text style={{ color: theme.colors.ink, fontFamily: theme.body, fontSize: 16 }}>‹ Back</Text></Pressable>
+        <Pressable onPress={() => router.navigate('/')} accessibilityLabel="Home"><Text style={{ color: theme.colors.ink, fontFamily: theme.body, fontSize: 16 }}>Home</Text></Pressable>
         <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>{toast || (saved ? 'On this device' : 'Not saved yet')}</Text>
         <Pressable onPress={() => setConfirmDelete(true)}><Text style={{ color: theme.colors.danger, fontFamily: theme.body }}>Delete</Text></Pressable>
       </View>
-      <ScrollView scrollEnabled={!decorate} contentContainerStyle={{ padding: 16, paddingBottom: decorate ? 20 : 40 }} keyboardShouldPersistTaps="handled">
+      <ScrollView style={{ flex: 1 }} scrollEnabled contentContainerStyle={{ padding: 16, paddingBottom: decorate ? 12 : 40 }} keyboardShouldPersistTaps="handled">
+        <PageFlip flipKey={`${draft.id}:${draft.date}`}>
         <View onLayout={(event) => setPageSize({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height })}>
           <Paper style={{ minHeight: 640 }}>
             <View pointerEvents={decorate ? 'none' : 'auto'} style={[padding, { zIndex: decorate ? 0 : 3 }]}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Pressable onPress={() => { playPageTurn(); setDraft({ ...draft, date: addDays(draft.date, -1) }); }}><Text style={{ color: theme.colors.paperInk, fontSize: 20 }}>‹</Text></Pressable>
+                <Pressable accessibilityLabel="Previous page" onPress={() => stepEntry(-1)}><Text style={{ color: theme.colors.paperInk, fontSize: 20 }}>‹</Text></Pressable>
                 <Text style={{ color: theme.colors.paperSoft, fontFamily: theme.body }}>{formatLong(draft.date)}</Text>
-                <Pressable onPress={() => { playPageTurn(); setDraft({ ...draft, date: addDays(draft.date, 1) }); }}><Text style={{ color: theme.colors.paperInk, fontSize: 20 }}>›</Text></Pressable>
+                <Pressable accessibilityLabel="Next page" onPress={() => stepEntry(1)}><Text style={{ color: theme.colors.paperInk, fontSize: 20 }}>›</Text></Pressable>
               </View>
               <Text style={{ color: theme.colors.paperInk, fontFamily: theme.script, fontSize: 22, marginTop: 8 }}>{prompt}</Text>
               <MoodPicker value={draft.mood} onChange={(mood) => setDraft({ ...draft, mood })} />
@@ -310,13 +362,22 @@ function updateSticker(next: StickerPlacement) {
             ) : null}
           </Paper>
         </View>
+        </PageFlip>
         {showThemes ? (
           <View style={{ paddingVertical: 8, gap: 8 }}>
             <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 22 }}>Page theme</Text>
             <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>
               {draft.themeOverride || draft.design ? 'This page keeps its own look. Other pages still follow the book.' : 'This page uses the book design. A choice here stays on this page only.'}
             </Text>
-            <Button label="Use book design" tone={draft.themeOverride || draft.design ? 'primary' : 'ghost'} onPress={() => setDraft({ ...draft, themeOverride: null, design: undefined })} />
+            <Button label="Use book design" tone={draft.themeOverride || draft.design || draft.fontId || draft.inkColor ? 'primary' : 'ghost'} onPress={() => setDraft({ ...draft, themeOverride: null, design: undefined, fontId: undefined, inkColor: undefined })} />
+            <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 22 }}>Page font</Text>
+            <FontFields
+              fontId={draft.fontId ?? null}
+              inkColor={draft.inkColor ?? null}
+              onFont={(fontId) => setDraft({ ...draft, fontId })}
+              onInk={(inkColor) => setDraft({ ...draft, inkColor: sanitizeInk(inkColor) })}
+              onReset={() => setDraft({ ...draft, fontId: undefined, inkColor: undefined })}
+            />
             <Button
               label={draft.design ? 'This page has its own colors' : 'Custom colors for this page'}
               tone="ghost"
@@ -337,17 +398,19 @@ function updateSticker(next: StickerPlacement) {
       </ScrollView>
 
       {decorate ? (
-        <View style={{ backgroundColor: theme.colors.card, borderTopWidth: 1, borderTopColor: theme.colors.paperEdge, padding: 10, paddingBottom: Math.max(insets.bottom, 10) }}>
+        <View style={{ maxHeight: '28%', backgroundColor: theme.colors.card, borderTopWidth: 1, borderTopColor: theme.colors.paperEdge, paddingHorizontal: 10, paddingTop: 6, paddingBottom: Math.max(insets.bottom, 8) }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, fontSize: 12 }}>Drag a sticker. Empty page scrolls. Two fingers scroll too.</Text>
+            <Button label="Done" onPress={() => setDecorate(false)} />
+          </View>
           {selected ? (
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 4 }}>
               <Button label="Smaller" tone="ghost" onPress={() => updateSticker({ ...selected, scale: Math.max(0.45, selected.scale / 1.12) })} />
               <Button label="Bigger" tone="ghost" onPress={() => updateSticker({ ...selected, scale: Math.min(2.3, selected.scale * 1.12) })} />
               <Button label="Rotate" tone="ghost" onPress={() => updateSticker({ ...selected, rotation: (selected.rotation + 15) % 360 })} />
               <Button label="Remove" tone="danger" onPress={() => { setDraft({ ...draft, stickers: draft.stickers.filter((item) => item.id !== selected.id) }); setSelectedId(null); }} />
             </View>
-          ) : (
-            <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, marginBottom: 6 }}>Drag a sticker. The gold dot resizes it.</Text>
-          )}
+          ) : null}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
             {listedPacks.map((pack) => (
               <Pressable key={pack.id} onPress={() => setPackId(pack.id)} style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: activePack.id === pack.id ? theme.colors.accent : theme.colors.chip }}>
@@ -397,7 +460,6 @@ function updateSticker(next: StickerPlacement) {
               );
             })}
           </ScrollView>
-          <Button label="Done decorating" onPress={() => setDecorate(false)} style={{ marginTop: 8 }} />
         </View>
       ) : (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 12, paddingBottom: Math.max(insets.bottom, 12) }}>

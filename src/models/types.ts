@@ -16,6 +16,8 @@ export type DiaryBook = {
   title: string;
   themeId: ThemeId;
   design?: ColorDesign | null;
+  fontId?: string | null;
+  inkColor?: string | null;
 };
 
 export type DiaryEntry = {
@@ -28,6 +30,8 @@ export type DiaryEntry = {
   stickers: StickerPlacement[];
   themeOverride: ThemeId | null;
   design?: ColorDesign | null;
+  fontId?: string | null;
+  inkColor?: string | null;
   createdAt: number;
   updatedAt: number;
   sample?: boolean;
@@ -77,6 +81,8 @@ export type Settings = {
   /** YYYY-MM-DD shop preview. Diary pages keep the real date. */
   debugDate: string | null;
   seasonAnnounced: string[];
+  fontId: string | null;
+  inkColor: string | null;
 };
 
 export type Wallet = {

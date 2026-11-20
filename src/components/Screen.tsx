@@ -1,6 +1,7 @@
+import { router, usePathname } from 'expo-router';
 import { type ReactNode } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemeAtmosphere } from './ThemeAtmosphere';
@@ -13,15 +14,18 @@ export function Screen({
   scroll = true,
   style,
   padded = true,
+  nav = true,
 }: {
   children: ReactNode;
   scroll?: boolean;
   style?: StyleProp<ViewStyle>;
   padded?: boolean;
+  nav?: boolean;
 }) {
   const theme = useTheme();
   const body = (
     <View style={[styles.column, padded && styles.padded, style]}>
+      {nav ? <NavRow /> : null}
       {children}
     </View>
   );
@@ -45,7 +49,31 @@ export function Screen({
   );
 }
 
+function NavRow() {
+  const theme = useTheme();
+  const path = usePathname();
+  const home = path === '/' || path === '/index';
+  return (
+    <View style={styles.nav}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Back"
+        onPress={() => {
+          if (router.canGoBack()) router.back();
+          else if (!home) router.replace('/');
+        }}
+      >
+        <Text style={{ color: theme.colors.ink, fontFamily: theme.body, fontSize: 16 }}>‹ Back</Text>
+      </Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="Home" onPress={() => router.navigate('/')}>
+        <Text style={{ color: home ? theme.colors.accent : theme.colors.ink, fontFamily: theme.body, fontSize: 16 }}>Home</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  nav: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   root: { flex: 1 },
   scroll: { paddingBottom: 28 },
   column: { width: '100%', maxWidth: 920, alignSelf: 'center', flexGrow: 1 },

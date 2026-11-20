@@ -40,8 +40,9 @@ function PlacedSticker({
   const pan = useMemo(
     () =>
       PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dx) + Math.abs(gesture.dy) > 2,
+        onStartShouldSetPanResponder: (event) => event.nativeEvent.touches.length < 2,
+        onMoveShouldSetPanResponder: (event, gesture) => event.nativeEvent.touches.length < 2 && Math.abs(gesture.dx) + Math.abs(gesture.dy) > 2,
+        onPanResponderTerminationRequest: (event) => event.nativeEvent.touches.length > 1,
         onPanResponderGrant: () => {
           selectRef.current(live.current.id);
           origin.current = { x: live.current.x, y: live.current.y, scale: live.current.scale };
@@ -82,7 +83,7 @@ function PlacedSticker({
   const size = BASE * placement.scale;
   return (
     <View
-      {...(decorate ? pan.panHandlers : {})}
+      {...pan.panHandlers}
       style={{
         position: 'absolute',
         left: placement.x * pageWidth - size / 2,
@@ -93,8 +94,14 @@ function PlacedSticker({
         zIndex: selected ? 8 : 2,
       }}
     >
-      <StickerView stickerId={placement.stickerId} size={size} selected={selected && decorate} />
-      {selected && decorate ? <View {...scalePan.panHandlers} style={styles.knob} /> : null}
+      <StickerView stickerId={placement.stickerId} size={size} selected={selected} />
+      {selected ? <View {...scalePan.panHandlers} style={styles.knob} /> : null}
+      {selected ? (
+        <View
+          style={styles.turn}
+          onTouchEnd={() => changeRef.current({ ...live.current, rotation: (live.current.rotation + 15) % 360 })}
+        />
+      ) : null}
     </View>
   );
 }
@@ -117,7 +124,7 @@ export function StickerLayer({
   onChange: (next: StickerPlacement) => void;
 }) {
   return (
-    <View pointerEvents={decorate ? 'box-none' : 'none'} style={StyleSheet.absoluteFill}>
+    <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
       {stickers.map((placement) => (
         <PlacedSticker
           key={placement.id}
@@ -143,6 +150,17 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
     backgroundColor: '#E2B23A',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  turn: {
+    position: 'absolute',
+    left: -8,
+    bottom: -8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#7AA2E3',
     borderWidth: 2,
     borderColor: '#fff',
   },

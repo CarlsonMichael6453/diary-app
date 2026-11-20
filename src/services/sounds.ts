@@ -1,5 +1,6 @@
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 
+import type { MoodId } from '../data/moods';
 import { BUDDY_SOUND_IDS, PAGE_SOUND_IDS, canPlaySound, pickPageSound } from '../logic/sound';
 import { useDiary } from '../store/useDiary';
 
@@ -77,6 +78,27 @@ export function playBuddySound(buddyId: string): void {
   if (!canPlaySound('buddy', prefs)) return;
   const source = buddySources[buddyId as (typeof BUDDY_SOUND_IDS)[number]];
   void play(buddyId, source, prefs.soundVolume);
+}
+
+const moodSources: Record<MoodId, number> = {
+  happy: require('../../assets/sounds/moods/happy.wav'),
+  calm: require('../../assets/sounds/moods/calm.wav'),
+  sad: require('../../assets/sounds/moods/sad.wav'),
+  anxious: require('../../assets/sounds/moods/anxious.wav'),
+  excited: require('../../assets/sounds/moods/excited.wav'),
+  grateful: require('../../assets/sounds/moods/grateful.wav'),
+  angry: require('../../assets/sounds/moods/angry.wav'),
+  tired: require('../../assets/sounds/moods/tired.wav'),
+  loved: require('../../assets/sounds/moods/loved.wav'),
+  hopeful: require('../../assets/sounds/moods/hopeful.wav'),
+};
+
+export function playMoodSound(moodId: MoodId): void {
+  const prefs = useDiary.getState().settings;
+  if (!prefs.soundEnabled || !(prefs.soundVolume > 0)) return;
+  const source = moodSources[moodId];
+  if (!source) return;
+  void play(`mood-${moodId}`, source, Math.min(0.85, prefs.soundVolume));
 }
 
 export function playPageTurn(): void {

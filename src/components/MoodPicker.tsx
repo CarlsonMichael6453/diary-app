@@ -1,6 +1,7 @@
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { MOODS, type MoodId } from '../data/moods';
+import { playMoodSound } from '../services/sounds';
 import { useTheme } from '../theme/BookTheme';
 
 export function MoodPicker({ value, onChange }: { value: MoodId; onChange: (mood: MoodId) => void }) {
@@ -13,7 +14,10 @@ export function MoodPicker({ value, onChange }: { value: MoodId; onChange: (mood
           <Pressable
             key={mood.id}
             accessibilityLabel={mood.label}
-            onPress={() => onChange(mood.id)}
+            onPress={() => {
+              if (mood.id !== value) playMoodSound(mood.id);
+              onChange(mood.id);
+            }}
             style={{
               alignItems: 'center',
               paddingHorizontal: 10,

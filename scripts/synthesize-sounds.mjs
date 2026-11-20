@@ -111,4 +111,21 @@ for (const [id, samples] of Object.entries(buddies)) {
   writeWav(join(root, 'buddies', `${id}.wav`), samples);
 }
 
-console.log(`wrote ${Object.keys(buddies).length} buddy sounds`);
+const moods = {
+  happy: concat([tone(1046, 0.12, { amp: 0.22, attack: 0.005, release: 0.08 }), silence(0.02), tone(1318, 0.18, { amp: 0.2, release: 0.12 })]),
+  excited: concat([tone(784, 0.08, { amp: 0.16 }), tone(988, 0.08, { amp: 0.16 }), tone(1318, 0.08, { amp: 0.18 }), tone(1568, 0.16, { amp: 0.16, release: 0.1 })]),
+  calm: tone(523, 0.7, { amp: 0.12, attack: 0.12, release: 0.28, partial: 0.15 }),
+  loved: concat([tone(659, 0.22, { amp: 0.18, attack: 0.02, release: 0.12 }), silence(0.03), tone(784, 0.28, { amp: 0.16, release: 0.16 })]),
+  sad: concat([tone(440, 0.22, { amp: 0.14, release: 0.1 }), tone(349, 0.26, { amp: 0.12, slide: -20, release: 0.14 })]),
+  angry: tone(98, 0.16, { amp: 0.28, attack: 0.004, release: 0.08, partial: 0.2 }),
+  anxious: tone(880, 0.45, { amp: 0.1, vib: 28, attack: 0.02, release: 0.12 }),
+  tired: tone(392, 0.7, { amp: 0.12, slide: -180, attack: 0.08, release: 0.22 }),
+  grateful: concat([tone(523, 0.2, { amp: 0.16, release: 0.1 }), tone(659, 0.28, { amp: 0.14, release: 0.16 })]),
+  hopeful: concat([tone(392, 0.18, { amp: 0.14 }), tone(587, 0.32, { amp: 0.16, slide: 20, release: 0.16 })]),
+};
+
+for (const [id, samples] of Object.entries(moods)) {
+  writeWav(join(root, 'moods', `${id}.wav`), samples);
+}
+
+console.log(`wrote ${Object.keys(buddies).length} buddy sounds and ${Object.keys(moods).length} mood sounds`);

@@ -16,6 +16,7 @@ function PlacedSticker({
   pageHeight,
   decorate,
   selected,
+  zIndex,
   onSelect,
   onChange,
 }: {
@@ -24,6 +25,7 @@ function PlacedSticker({
   pageHeight: number;
   decorate: boolean;
   selected: boolean;
+  zIndex: number;
   onSelect: (id: string) => void;
   onChange: (next: StickerPlacement) => void;
 }) {
@@ -91,7 +93,7 @@ function PlacedSticker({
         width: size,
         height: size,
         transform: [{ rotate: `${placement.rotation}deg` }],
-        zIndex: selected ? 8 : 2,
+        zIndex,
       }}
     >
       <StickerView stickerId={placement.stickerId} size={size} selected={selected} />
@@ -112,6 +114,7 @@ export function StickerLayer({
   height,
   decorate,
   selectedId,
+  textZ,
   onSelect,
   onChange,
 }: {
@@ -120,11 +123,12 @@ export function StickerLayer({
   height: number;
   decorate: boolean;
   selectedId: string | null;
+  textZ: number;
   onSelect: (id: string) => void;
   onChange: (next: StickerPlacement) => void;
 }) {
   return (
-    <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+    <>
       {stickers.map((placement) => (
         <PlacedSticker
           key={placement.id}
@@ -133,11 +137,12 @@ export function StickerLayer({
           pageHeight={height}
           decorate={decorate}
           selected={placement.id === selectedId}
+          zIndex={(placement.z ?? textZ + 1) < textZ ? 4 : 22 + (placement.z ?? 0)}
           onSelect={onSelect}
           onChange={onChange}
         />
       ))}
-    </View>
+    </>
   );
 }
 

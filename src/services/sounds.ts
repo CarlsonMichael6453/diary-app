@@ -1,4 +1,5 @@
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
+import { Platform } from 'react-native';
 
 import type { MoodId } from '../data/moods';
 import { BUDDY_SOUND_IDS, PAGE_SOUND_IDS, canPlaySound, pickPageSound } from '../logic/sound';
@@ -38,8 +39,56 @@ const pageSources: Record<(typeof PAGE_SOUND_IDS)[number], number> = {
 };
 
 const players = new Map<string, AudioPlayer>();
+const pagePools = new Map<string, AudioPlayer[]>();
 let lastPageId: string | null = null;
 let modeReady: Promise<void> | null = null;
+let pageSoundsPrimed = false;
+let suppressRouteUntil = 0;
+
+function ensurePagePool(): void {
+  for (const id of PAGE_SOUND_IDS) {
+    if (pagePools.has(id)) continue;
+    pagePools.set(id, [createAudioPlayer(pageSources[id])]);
+  }
+}
+
+function takePagePlayer(id: (typeof PAGE_SOUND_IDS)[number]): AudioPlayer {
+  ensurePagePool();
+  const list = pagePools.get(id) ?? [];
+  const free = list.find((player) => !player.playing);
+  if (free) return free;
+  const extra = createAudioPlayer(pageSources[id]);
+  list.push(extra);
+  pagePools.set(id, list);
+  return extra;
+}
+
+/** Create the 15 page-turn players. On web, start them inside a user gesture so later flips are allowed to overlap. */
+export function primePageSounds(): void {
+  ensurePagePool();
+  if (pageSoundsPrimed) return;
+  pageSoundsPrimed = true;
+  if (Platform.OS !== 'web') return;
+  for (const list of pagePools.values()) {
+    const player = list[0];
+    if (!player) continue;
+    player.volume = 0;
+    try {
+      player.play();
+      player.pause();
+    } catch {
+      // The element is still created; a later gesture can unlock it.
+    }
+  }
+}
+
+if (Platform.OS === 'web' && typeof window !== 'undefined') {
+  const unlock = () => {
+    primePageSounds();
+    window.removeEventListener('pointerdown', unlock, true);
+  };
+  window.addEventListener('pointerdown', unlock, true);
+}
 
 function ensureMode(): Promise<void> {
   modeReady ??= setAudioModeAsync({
@@ -101,22 +150,41 @@ export function playMoodSound(moodId: MoodId): void {
   void play(`mood-${moodId}`, source, Math.min(0.85, prefs.soundVolume));
 }
 
-let lastPageAt = 0;
-
-export function playPageTurn(): void {
-  const now = Date.now();
-  if (now - lastPageAt < 650) return;
+export function playPageTurn(): boolean {
   const prefs = useDiary.getState().settings;
-  if (!canPlaySound('page', prefs)) return;
+  if (!canPlaySound('page', prefs)) return false;
+  ensurePagePool();
   const id = pickPageSound(PAGE_SOUND_IDS, lastPageId);
-  if (!id) return;
+  if (!id) return false;
   lastPageId = id;
-  lastPageAt = now;
-  const source = pageSources[id as (typeof PAGE_SOUND_IDS)[number]];
-  void play(id, source, prefs.soundVolume);
+  const sourceId = id as (typeof PAGE_SOUND_IDS)[number];
+  const player = takePagePlayer(sourceId);
+  player.volume = Math.min(1, Math.max(0, prefs.soundVolume));
+  try {
+    void player.seekTo(0);
+  } catch {
+    // A player that has not loaded yet can still start from the beginning.
+  }
+  player.play();
+  if (typeof __DEV__ !== 'undefined' && __DEV__) console.log('[page-turn] play', id);
+  return true;
+}
+
+/** A curl, arrow, Back, or open committed. The matching route-change sound is skipped so this one is the only play. */
+export function playCurlCommit(): boolean {
+  suppressRouteUntil = Date.now() + 700;
+  return playPageTurn();
+}
+
+/** Tab and screen changes. Skipped when a page curl just committed the same navigation. */
+export function playRouteTurn(): boolean {
+  if (Date.now() < suppressRouteUntil) return false;
+  return playPageTurn();
 }
 
 const plusSource = require('../../assets/sounds/plus/celebrate.wav');
+
+ensurePagePool();
 
 export function playPlusSound(): void {
   const prefs = useDiary.getState().settings;

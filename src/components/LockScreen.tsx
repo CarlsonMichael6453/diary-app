@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, AppState, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, AppState, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { isShake, isWiggle, type MotionSample } from '../logic/motion';
 import { BookCover } from './BookCover';
@@ -93,6 +93,8 @@ export function LockOverlay() {
   const shakeToOpen = useDiary((state) => state.settings.shakeToOpen);
   const lockEnabled = useDiary((state) => state.settings.lockEnabled);
   const bookTitle = useDiary((state) => state.settings.bookTitle);
+  const screen = useWindowDimensions();
+  const coverWidth = Math.round(Math.min(screen.width - 48, (screen.height - 230) / 1.35, 300));
   const [open, setOpen] = useState(false);
   const [bio, setBio] = useState(false);
   const swing = useRef(new Animated.Value(0)).current;
@@ -218,7 +220,7 @@ export function LockOverlay() {
       }
     >
       <Animated.View style={coverStyle}>
-        <BookCover title={bookTitle} theme={theme} />
+        <BookCover title={bookTitle} theme={theme} width={coverWidth} />
       </Animated.View>
       {lockOnOpen && lockEnabled ? (
         <View style={{ marginTop: 18, width: '100%' }}>

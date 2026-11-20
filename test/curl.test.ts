@@ -1,35 +1,36 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { CURL_DIAMETER, curlLayout } from '../src/logic/curl';
+import { CURL_DIAMETER, curlLayout, foldAngle } from '../src/logic/curl';
+import { releaseCurl } from '../src/logic/swipe';
 
 describe('soft curl', () => {
-  it('stays flat until the drag actually moves', () => {
-    const flat = curlLayout(0, 400);
-    assert.equal(flat.side, 'flat');
-    assert.equal(flat.coverWidth, 0);
-    assert.equal(curlLayout(0.002, 400).side, 'flat');
+  it('pins the fold to the finger with no dead zone', () => {
+    const layout = curlLayout(120, 200, 400, 640, 'next');
+    assert.equal(layout.foldX, 120);
+    assert.equal(layout.side, 'next');
+    assert.equal(layout.coverLeft, 120);
+    assert.ok(Math.abs(layout.curlLeft + layout.curlWidth * 0.35 - 120) < 1);
+    assert.equal(layout.curlWidth, 400 * CURL_DIAMETER);
+    const back = curlLayout(250, 200, 400, 640, 'prev');
+    assert.equal(back.foldX, 250);
+    assert.equal(back.coverWidth, 250);
   });
 
-  it('curls the right edge toward the next page and the left edge back', () => {
-    const next = curlLayout(-0.5, 400);
-    assert.equal(next.side, 'next');
-    assert.ok(next.curlLeft < 400);
-    assert.ok(next.curlLeft > 0);
-    assert.equal(next.curlWidth, 400 * CURL_DIAMETER);
-    assert.ok(next.coverLeft >= next.curlLeft - 1);
-    const prev = curlLayout(0.5, 400);
-    assert.equal(prev.side, 'prev');
-    assert.ok(prev.coverWidth > 0);
-    assert.ok(prev.coverWidth < 400);
-    assert.ok(prev.curlLeft < prev.coverWidth);
+  it('tilts the fold toward the finger height and stays straight in the middle', () => {
+    assert.ok(Math.abs(foldAngle(320, 640)) < 1);
+    assert.ok(foldAngle(40, 640) < -10);
+    assert.ok(foldAngle(600, 640) > 10);
+    assert.ok(curlLayout(100, 40, 400, 640, 'next').angle < 0);
   });
 
-  it('follows a reversal from next back through flat', () => {
-    const forward = curlLayout(-0.4, 300);
-    const back = curlLayout(0.15, 300);
-    assert.equal(forward.side, 'next');
-    assert.equal(back.side, 'prev');
-    assert.ok(curlLayout(-1, 300).coverWidth > curlLayout(-0.2, 300).coverWidth);
+  it('rubber-bands a missing page and still commits a real fling', () => {
+    assert.equal(releaseCurl('next', 0.5, 0, true), 'cancel');
+    assert.equal(releaseCurl('prev', 0.8, 0, true), 'cancel');
+    assert.equal(releaseCurl('next', 0.4, 0, false), 'commit');
+    assert.equal(releaseCurl('next', 0.1, -1200, false), 'commit');
+    assert.equal(releaseCurl('prev', 0.1, 1200, false), 'commit');
+    assert.equal(releaseCurl('next', 0.5, 1200, false), 'cancel');
+    assert.equal(releaseCurl('next', 0.1, 0, false), 'cancel');
   });
 });

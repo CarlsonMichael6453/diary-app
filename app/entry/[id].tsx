@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams, type Href } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BackHandler, PanResponder, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { BackHandler, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BuddyView } from '@/src/buddies/BuddyView';
@@ -9,6 +9,7 @@ import { EntryExtras } from '@/src/components/EntryExtras';
 import { MoodPicker } from '@/src/components/MoodPicker';
 import { FontFields } from '@/src/components/FontFields';
 import { PhotoNoteLayer } from '@/src/components/PhotoNoteLayer';
+import { EndPaper, NeighborPage } from '@/src/components/NeighborPage';
 import { PageFlip, type PageFlipHandle } from '@/src/components/PageFlip';
 import { Paper } from '@/src/components/Paper';
 import { Screen } from '@/src/components/Screen';
@@ -23,7 +24,6 @@ import { birthdayFrom, shopToday } from '@/src/logic/seasons';
 import { addDays, formatLong, todayKey } from '@/src/logic/dates';
 import { uid } from '@/src/logic/id';
 import { writingStreak } from '@/src/logic/streak';
-import { claimHorizontalSwipe, releaseSwipe } from '@/src/logic/swipe';
 import { collageSlots, type CollagePreset } from '@/src/logic/collage';
 import { PAGE_TEXT_ID, reorderStack, type LayerMove } from '@/src/logic/layers';
 import type { DiaryEntry, NotePlacement, PhotoFrame, PhotoPlacement, StickerPlacement } from '@/src/models/types';
@@ -167,10 +167,6 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
   const [scrollOn, setScrollOn] = useState(true);
   const leaving = useRef(false);
   const flipRef = useRef<PageFlipHandle>(null);
-  const editingRef = useRef(false);
-  const widthRef = useRef(1);
-  editingRef.current = editing;
-  widthRef.current = pageSize.width || 1;
   const review = useReviewMoment();
   const prompt = promptForDate(draft.date);
   const listedPacks = PACKS.filter((pack) => packIsListed(pack, wallet.ownedPackIds, shopToday(settings.debugDate), birthdayFrom(settings.birthdayMonth, settings.birthdayDay)));
@@ -262,30 +258,17 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
     setDraft({ ...draft, date: addDays(draft.date, delta) });
   }
 
-  const stepRef = useRef(stepEntry);
-  stepRef.current = stepEntry;
-  const swipe = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gesture) => claimHorizontalSwipe(gesture.dx, gesture.dy, editingRef.current),
-        onPanResponderGrant: () => setScrollOn(false),
-        onPanResponderMove: (_, gesture) => {
-          flipRef.current?.follow(gesture.dx / Math.max(widthRef.current, 240));
-        },
-        onPanResponderRelease: (_, gesture) => {
-          setScrollOn(true);
-          const decision = releaseSwipe(gesture.dx / Math.max(widthRef.current, 240), gesture.vx);
-          if (decision === 'cancel') flipRef.current?.cancel();
-          else flipRef.current?.finish(decision, () => stepRef.current(decision === 'next' ? 1 : -1));
-        },
-        onPanResponderTerminate: () => {
-          setScrollOn(true);
-          flipRef.current?.cancel();
-        },
-        onPanResponderTerminationRequest: () => false,
-      }),
-    [],
-  );
+  const neighbors = useMemo(() => {
+    const bookId = draft.bookId ?? settings.activeBookId;
+    const ordered = entries
+      .filter((entry) => (entry.bookId ?? 'daily') === bookId)
+      .sort((a, b) => a.date.localeCompare(b.date) || a.createdAt - b.createdAt);
+    const index = ordered.findIndex((entry) => entry.id === draft.id);
+    return {
+      prev: index > 0 ? ordered[index - 1] : null,
+      next: index >= 0 && index < ordered.length - 1 ? ordered[index + 1] : null,
+    };
+  }, [draft.bookId, draft.id, entries, settings.activeBookId]);
 
   function pageNeedsSave(latest: Draft): boolean {
   const content = latest.title.trim() || latest.body.trim() || latest.photos.length > 0 || latest.stickers.length > 0 || latest.photoPlacements.length > 0 || latest.notes.length > 0 || latest.photoOnly || latest.themeOverride || latest.design || latest.fontId || latest.inkColor;
@@ -371,8 +354,18 @@ function updateSticker(next: StickerPlacement) {
         <Pressable onPress={() => setConfirmDelete(true)}><Text style={{ color: theme.colors.danger, fontFamily: theme.body }}>Delete</Text></Pressable>
       </View>
       <ScrollView style={{ flex: 1 }} scrollEnabled={scrollOn} contentContainerStyle={{ padding: 16, paddingBottom: decorate ? 12 : 40 }} keyboardShouldPersistTaps="handled">
-        <PageFlip ref={flipRef} flipKey={`${draft.id}:${draft.date}`}>
-        <View {...swipe.panHandlers} onLayout={(event) => setPageSize({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height })}>
+        <PageFlip
+          ref={flipRef}
+          flipKey={`${draft.id}:${draft.date}`}
+          editing={editing}
+          canNext={Boolean(neighbors.next)}
+          canPrev={Boolean(neighbors.prev)}
+          onScrollLock={setScrollOn}
+          onCommit={(direction) => stepEntry(direction === 'next' ? 1 : -1)}
+          nextSheet={neighbors.next ? <NeighborPage entry={neighbors.next} book={settings.books.find((book) => book.id === (neighbors.next?.bookId ?? settings.activeBookId))} premium={wallet.premium} /> : <EndPaper edge="end" />}
+          prevSheet={neighbors.prev ? <NeighborPage entry={neighbors.prev} book={settings.books.find((book) => book.id === (neighbors.prev?.bookId ?? settings.activeBookId))} premium={wallet.premium} /> : <EndPaper edge="start" />}
+        >
+        <View onLayout={(event) => setPageSize({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height })}>
           <Paper style={{ minHeight: 640 }}>
             <View pointerEvents={decorate ? 'none' : 'auto'} style={[padding, { zIndex: 80, position: 'relative', paddingBottom: 0 }]}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -562,7 +555,7 @@ function updateSticker(next: StickerPlacement) {
               await addPhotos([result.uri]);
             }} />
             <Button label="Note" tone="ghost" onPress={() => {
-              const note: NotePlacement = { id: uid('note'), text: 'A little note', x: 0.5, y: 0.55, scale: 1, rotation: -4, style: 'sticky', fontId: draft.fontId, inkColor: draft.inkColor, z: nextZ() };
+              const note: NotePlacement = { id: uid('note'), text: '', x: 0.5, y: 0.55, scale: 1, rotation: -4, style: 'sticky', fontId: draft.fontId, inkColor: draft.inkColor, z: nextZ() };
               setDraft({ ...draft, notes: [...draft.notes, note] });
               setSelectedId(note.id);
             }} />

@@ -4,6 +4,7 @@ import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
 
 import { useTheme } from '../theme/BookTheme';
 import type { Theme } from '../theme/themes';
+import { PatternFill } from './PatternFill';
 
 function Pattern({ theme, width, height }: { theme: Theme; width: number; height: number }) {
   if (width < 10 || height < 10 || theme.paper === 'plain') return null;
@@ -71,6 +72,7 @@ export function Paper({ children, style, showLines = true }: { children: ReactNo
         style,
       ]}
     >
+      {theme.design ? <PatternFill design={theme.design} /> : null}
       <View style={[styles.binding, { backgroundColor: theme.colors.binding }]} />
       {showLines ? <Pattern theme={theme} width={size.width} height={size.height} /> : null}
       <View style={[styles.tape, { backgroundColor: theme.colors.tape }]} />

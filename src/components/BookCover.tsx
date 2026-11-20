@@ -1,8 +1,9 @@
 import { Text, View } from 'react-native';
 
-import type { Theme } from '../theme/themes';
+import type { PaintedTheme } from '../theme/designs';
+import { PatternFill } from './PatternFill';
 
-export function BookCover({ title, theme, width = 250 }: { title: string; theme: Theme; width?: number }) {
+export function BookCover({ title, theme, width = 250 }: { title: string; theme: PaintedTheme; width?: number }) {
   const height = Math.round(width * 1.35);
   return (
     <View
@@ -18,6 +19,7 @@ export function BookCover({ title, theme, width = 250 }: { title: string; theme:
         borderColor: theme.colors.paperEdge,
       }}
     >
+      {theme.design ? <PatternFill design={theme.design} /> : null}
       <View style={{ width: Math.max(16, width * 0.08), backgroundColor: theme.colors.binding }} />
       <View style={{ flex: 1, padding: 18, justifyContent: 'space-between' }}>
         <Text style={{ fontSize: 40 }}>{theme.emoji}</Text>

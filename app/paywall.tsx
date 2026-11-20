@@ -47,7 +47,7 @@ export default function PaywallScreen() {
         <Text style={{ color: theme.colors.onAccent, fontFamily: theme.body, fontSize: 12 }}>TEST MODE</Text>
         <Text style={{ color: theme.colors.onAccent, fontFamily: theme.display, fontSize: 36 }}>Diary Plus</Text>
         <Text style={{ color: theme.colors.onAccent, fontFamily: theme.body }}>
-          Rare, epic, and legendary packs, Ember and Lumi, and the animated book styles. This screen is a mock checkout so RevenueCat can be plugged in later. Nothing is charged.
+          Rare packs, Ember and Lumi, animated book styles, and the color designer’s moving patterns and metallic shine. This screen is a mock checkout so RevenueCat can be plugged in later. Nothing is charged.
         </Text>
       </View>
       {premium ? <Text style={{ color: theme.colors.ink, fontFamily: theme.body, marginTop: 12 }}>You already have Diary Plus on this device.</Text> : null}

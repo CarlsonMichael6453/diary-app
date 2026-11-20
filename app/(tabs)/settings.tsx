@@ -69,6 +69,8 @@ export default function SettingsScreen() {
 
       <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 26, marginTop: 18 }}>Book style</Text>
       <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, marginBottom: 8 }}>This changes the whole book and its cover. A single page can still wear something else. Animated styles are Diary Plus.</Text>
+      <Button label="Design your own colors" onPress={() => router.push('/color-designer' as Href)} />
+      <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, marginTop: 6, marginBottom: 8 }}>Free patterns, or Diary Plus for motion and metallic shine.</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
         {THEMES.map((item) => {
           const selected = settings.themeId === item.id;

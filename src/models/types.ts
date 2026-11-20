@@ -1,4 +1,5 @@
 import type { MoodId } from '../data/moods';
+import type { ColorDesign } from '../theme/designs';
 import type { ThemeId } from '../theme/themes';
 
 export type StickerPlacement = {
@@ -14,6 +15,7 @@ export type DiaryBook = {
   id: string;
   title: string;
   themeId: ThemeId;
+  design?: ColorDesign | null;
 };
 
 export type DiaryEntry = {
@@ -25,6 +27,7 @@ export type DiaryEntry = {
   photos: string[];
   stickers: StickerPlacement[];
   themeOverride: ThemeId | null;
+  design?: ColorDesign | null;
   createdAt: number;
   updatedAt: number;
   sample?: boolean;

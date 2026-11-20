@@ -13,6 +13,7 @@ import { birthdayFrom, isSeasonalPack, packOnSale, shopToday } from '../logic/se
 import { loginProgress } from '../logic/streak';
 import { writingStreak } from '../logic/streak';
 import type { DiaryEntry, Settings, Snapshot, Wallet } from '../models/types';
+import type { ColorDesign } from '../theme/designs';
 import { getProduct } from '../services/purchases';
 import { STICKERS, getPack, getSticker, stickersInPack } from '../stickers/catalog';
 import type { ThemeId } from '../theme/themes';
@@ -161,6 +162,11 @@ type DiaryStore = DiaryData & {
   setActiveBook: (bookId: string) => void;
   addBook: (title: string) => void;
   markBackup: (iso: string) => void;
+  setBookDesign: (design: ColorDesign | null) => void;
+  rememberPageDesign: (design: ColorDesign | null) => void;
+  offerPageDesign: (design: ColorDesign | null) => void;
+  pageDesignSeed: ColorDesign | null;
+  pageDesignTicket: { token: number; design: ColorDesign | null } | null;
 };
 
 function asSnapshot(value: unknown): Snapshot | null {
@@ -174,6 +180,8 @@ export const useDiary = create<DiaryStore>()(
   persist(
     (set, get) => ({
       ...initialData(),
+      pageDesignSeed: null,
+      pageDesignTicket: null,
       upsertEntry: (entry) => {
         let bonus = 0;
         set((state) => {
@@ -363,6 +371,15 @@ export const useDiary = create<DiaryStore>()(
           return { settings: { ...state.settings, books: [...state.settings.books, book], activeBookId: id } };
         }),
       markBackup: (iso) => set((state) => ({ settings: { ...state.settings, lastBackupAt: iso } })),
+      setBookDesign: (design) =>
+        set((state) => ({
+          settings: {
+            ...state.settings,
+            books: state.settings.books.map((book) => (book.id === state.settings.activeBookId ? { ...book, design } : book)),
+          },
+        })),
+      rememberPageDesign: (design) => set({ pageDesignSeed: design }),
+      offerPageDesign: (design) => set({ pageDesignTicket: { token: Date.now(), design } }),
       snapshot: () => {
         const { settings, entries, wallet } = get();
         return { version: 2, exportedAt: new Date().toISOString(), settings, entries, wallet, books: settings.books };

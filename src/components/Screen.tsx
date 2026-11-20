@@ -4,6 +4,7 @@ import { ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 're
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemeAtmosphere } from './ThemeAtmosphere';
+import { PatternFill } from './PatternFill';
 import { isDarkHex } from '../theme/themes';
 import { useTheme } from '../theme/BookTheme';
 
@@ -27,8 +28,9 @@ export function Screen({
   return (
     <View style={[styles.root, { backgroundColor: theme.colors.bg }]}>
       <StatusBar style={isDarkHex(theme.colors.bg) ? 'light' : 'dark'} />
-      <View style={[styles.blob, { backgroundColor: theme.colors.accent, opacity: 0.18, top: -40, right: -30 }]} />
-      <View style={[styles.blob, { backgroundColor: theme.colors.accent2, opacity: 0.16, bottom: 80, left: -50, width: 180, height: 180 }]} />
+      {theme.design ? <PatternFill design={theme.design} /> : null}
+      {theme.design ? null : <View style={[styles.blob, { backgroundColor: theme.colors.accent, opacity: 0.18, top: -40, right: -30 }]} />}
+      {theme.design ? null : <View style={[styles.blob, { backgroundColor: theme.colors.accent2, opacity: 0.16, bottom: 80, left: -50, width: 180, height: 180 }]} />}
       <ThemeAtmosphere />
       <SafeAreaView style={styles.root} edges={['top', 'left', 'right']}>
         {scroll ? (

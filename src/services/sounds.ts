@@ -101,12 +101,25 @@ export function playMoodSound(moodId: MoodId): void {
   void play(`mood-${moodId}`, source, Math.min(0.85, prefs.soundVolume));
 }
 
+let lastPageAt = 0;
+
 export function playPageTurn(): void {
+  const now = Date.now();
+  if (now - lastPageAt < 650) return;
   const prefs = useDiary.getState().settings;
   if (!canPlaySound('page', prefs)) return;
   const id = pickPageSound(PAGE_SOUND_IDS, lastPageId);
   if (!id) return;
   lastPageId = id;
+  lastPageAt = now;
   const source = pageSources[id as (typeof PAGE_SOUND_IDS)[number]];
   void play(id, source, prefs.soundVolume);
+}
+
+const plusSource = require('../../assets/sounds/plus/celebrate.wav');
+
+export function playPlusSound(): void {
+  const prefs = useDiary.getState().settings;
+  if (!prefs.soundEnabled || !(prefs.soundVolume > 0)) return;
+  void play('plus-celebrate', plusSource, Math.min(0.8, prefs.soundVolume));
 }

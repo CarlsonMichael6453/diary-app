@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Platform, Pressable, Share, Text, TextInput, View } from 'react-native';
 
 import { getBuddy } from '@/src/buddies/catalog';
+import { FontFields } from '@/src/components/FontFields';
 import { LibraryPanel } from '@/src/components/LibraryPanel';
 import { SeasonSettings } from '@/src/components/SeasonSettings';
 import { PasscodePad } from '@/src/components/LockScreen';
@@ -70,6 +71,14 @@ export default function SettingsScreen() {
       <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 26, marginTop: 18 }}>Book style</Text>
       <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, marginBottom: 8 }}>This changes the whole book and its cover. A single page can still wear something else. Animated styles are Diary Plus.</Text>
       <Button label="Design your own colors" onPress={() => router.push('/color-designer' as Href)} />
+      <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 26, marginTop: 18 }}>Default font</Text>
+      <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, marginBottom: 8 }}>This book’s writing font and ink. A page can still choose its own.</Text>
+      <FontFields
+        fontId={settings.fontId}
+        inkColor={settings.inkColor}
+        onFont={(fontId) => patchSettings({ fontId, books: settings.books.map((book) => book.id === settings.activeBookId ? { ...book, fontId } : book) })}
+        onInk={(inkColor) => patchSettings({ inkColor, books: settings.books.map((book) => book.id === settings.activeBookId ? { ...book, inkColor } : book) })}
+      />
       <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, marginTop: 6, marginBottom: 8 }}>Free patterns, or Diary Plus for motion and metallic shine.</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
         {THEMES.map((item) => {

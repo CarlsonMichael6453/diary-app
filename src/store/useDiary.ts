@@ -116,6 +116,8 @@ export function defaultSettings(): Settings {
     birthdayDay: null,
     debugDate: null,
     seasonAnnounced: [],
+    fontId: null,
+    inkColor: null,
   };
 }
 

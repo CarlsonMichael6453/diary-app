@@ -8,6 +8,12 @@ import { LibreBaskerville_400Regular, LibreBaskerville_700Bold } from '@expo-goo
 import { Quicksand_500Medium, Quicksand_700Bold } from '@expo-google-fonts/quicksand';
 import { Cinzel_600SemiBold, Cinzel_700Bold } from '@expo-google-fonts/cinzel';
 import { Bungee_400Regular } from '@expo-google-fonts/bungee';
+import { PatrickHand_400Regular } from '@expo-google-fonts/patrick-hand';
+import { Pacifico_400Regular } from '@expo-google-fonts/pacifico';
+import { PermanentMarker_400Regular } from '@expo-google-fonts/permanent-marker';
+import { SpecialElite_400Regular } from '@expo-google-fonts/special-elite';
+import { IBMPlexMono_400Regular, IBMPlexMono_500Medium, IBMPlexMono_700Bold } from '@expo-google-fonts/ibm-plex-mono';
+import { Lora_400Regular, Lora_600SemiBold, Lora_700Bold } from '@expo-google-fonts/lora';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -54,6 +60,16 @@ export default function RootLayout() {
     Cinzel_600SemiBold,
     Cinzel_700Bold,
     Bungee_400Regular,
+    PatrickHand_400Regular,
+    Pacifico_400Regular,
+    PermanentMarker_400Regular,
+    SpecialElite_400Regular,
+    IBMPlexMono_400Regular,
+    IBMPlexMono_500Medium,
+    IBMPlexMono_700Bold,
+    Lora_400Regular,
+    Lora_600SemiBold,
+    Lora_700Bold,
   });
 
   useEffect(() => {

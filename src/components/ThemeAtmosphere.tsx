@@ -23,8 +23,8 @@ export function ThemeAtmosphere() {
     if (reduce || motion === 'none') return;
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(drift, { toValue: 1, duration: motion === 'lava' ? 7000 : 5000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(drift, { toValue: 0, duration: motion === 'lava' ? 7000 : 5000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(drift, { toValue: 1, duration: motion === 'lava' ? 2200 : 1600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(drift, { toValue: 0, duration: motion === 'lava' ? 2200 : 1600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
       ]),
     );
     loop.start();
@@ -33,8 +33,8 @@ export function ThemeAtmosphere() {
 
   if (reduce || motion === 'none') return null;
   const colors = DRIFT[motion];
-  const travel = drift.interpolate({ inputRange: [0, 1], outputRange: [0, motion === 'sparkle' ? 80 : 36] });
-  const fall = drift.interpolate({ inputRange: [0, 1], outputRange: [-20, 120] });
+  const travel = drift.interpolate({ inputRange: [0, 1], outputRange: [0, motion === 'sparkle' ? 220 : 140] });
+  const fall = drift.interpolate({ inputRange: [0, 1], outputRange: [-80, 280] });
   const glow = drift.interpolate({ inputRange: [0, 1], outputRange: [0.18, motion === 'neon' ? 0.55 : 0.4] });
 
   return (

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { restoreSavedDesigns } from '../src/logic/savedDesigns';
+import { FONT_CHOICES, inheritedType } from '../src/theme/fonts';
 import type { DiaryEntry, Settings } from '../src/models/types';
 import { getTheme } from '../src/theme/themes';
 import {
@@ -127,5 +128,22 @@ describe('color designer', () => {
     assert.equal(broken.entries[0]?.design, undefined);
     assert.equal(broken.entries[0]?.themeOverride, null);
     assert.equal(getTheme(restored.settings.themeId).id, 'ocean');
+  });
+
+  it('offers at least 15 fonts and lets a page override the book font', () => {
+    assert.ok(FONT_CHOICES.length >= 15);
+    assert.equal(new Set(FONT_CHOICES.map((font) => font.id)).size, FONT_CHOICES.length);
+    const book = { fontId: 'caveat', inkColor: '#1C3F6E' };
+    assert.deepEqual(inheritedType(book, { fontId: null, inkColor: null }), { fontId: 'caveat', inkColor: '#1C3F6E' });
+    assert.deepEqual(inheritedType(book, { fontId: 'plex', inkColor: '#E36B8A' }), { fontId: 'plex', inkColor: '#E36B8A' });
+    assert.equal(inheritedType({ ...book, fontId: 'lora' }, { fontId: 'plex', inkColor: '#E36B8A' }).fontId, 'plex');
+    const restored = restoreSavedDesigns(
+      { themeId: 'cutesy', activeBookId: 'daily', fontId: 'nope', inkColor: 'blue', books: [{ id: 'daily', title: 'Daily', themeId: 'cutesy', fontId: 'typewriter', inkColor: '#3A2A32' }] } as Settings,
+      [{ id: 'p', date: '2026-11-20', title: '', body: '', mood: 'calm', photos: [], stickers: [], themeOverride: null, createdAt: 1, updatedAt: 1, fontId: 'marker', inkColor: '#not' }],
+    );
+    assert.equal(restored.settings.fontId, null);
+    assert.equal(restored.settings.books[0]?.fontId, 'typewriter');
+    assert.equal(restored.entries[0]?.fontId, 'marker');
+    assert.equal(restored.entries[0]?.inkColor, null);
   });
 });

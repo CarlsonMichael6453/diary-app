@@ -20,14 +20,14 @@ export function PatternFill({ design, style }: { design: ColorDesign; style?: St
     if (!animate) return;
     travel.setValue(0);
     const loop = Animated.loop(
-      Animated.timing(travel, { toValue: 1, duration: design.motion === 'shimmer' ? 1700 : 4800, easing: Easing.linear, useNativeDriver: true }),
+      Animated.timing(travel, { toValue: 1, duration: design.motion === 'shimmer' ? 700 : 1400, easing: Easing.linear, useNativeDriver: true }),
     );
     loop.start();
     return () => loop.stop();
   }, [animate, design.motion, design.metal, travel]);
 
-  const slide = travel.interpolate({ inputRange: [0, 1], outputRange: [-width, width] });
-  const pulse = travel.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.18, 0.72, 0.18] });
+  const slide = travel.interpolate({ inputRange: [0, 1], outputRange: [-width * 1.8, width * 1.8] });
+  const pulse = travel.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.08, 0.95, 0.08] });
   const a = swatchHex(design.colorA);
   const b = swatchHex(design.colorB);
   const sheen = metal ? metalById(metal).shine : '#FFFFFF';
@@ -57,7 +57,7 @@ export function PatternFill({ design, style }: { design: ColorDesign; style?: St
         </Animated.View>
       ) : null}
       {animate && design.motion === 'drift' ? (
-        <Animated.View style={[styles.wide, { width: width * 2, height: height * 1.4, transform: [{ translateX: slide }, { translateY: Animated.multiply(travel, -height * 0.25) }] }]}>
+        <Animated.View style={[styles.wide, { width: width * 2, height: height * 1.8, transform: [{ translateX: slide }, { translateY: Animated.multiply(travel, -height * 0.9) }] }]}>
           <Svg width={width * 2} height={height * 1.4}>
             {driftShapes(width * 2, height * 1.4, design.pattern === 'hearts' ? 'hearts' : 'dots', b)}
           </Svg>
@@ -222,7 +222,7 @@ function starPath(cx: number, cy: number, r: number): string {
 function wavePath(width: number, height: number, across: number): string {
   const y = height * across;
   let d = `M 0 ${y}`;
-  for (let x = 0; x <= width; x += 24) d += ` Q ${x + 12} ${y + (x / 24) % 2 === 0 ? -16 : 16} ${x + 24} ${y}`;
+  for (let x = 0; x <= width; x += 28) d += ` Q ${x + 14} ${y + (x / 28) % 2 === 0 ? -42 : 42} ${x + 28} ${y}`;
   return d;
 }
 

@@ -1,6 +1,7 @@
 import { useMemo, useRef } from 'react';
 import { PanResponder, StyleSheet, View } from 'react-native';
 
+import { holdDecoration } from '../logic/pageGesture';
 import type { StickerPlacement } from '../models/types';
 import { StickerView } from '../stickers/StickerView';
 
@@ -46,9 +47,12 @@ function PlacedSticker({
         onMoveShouldSetPanResponder: (event, gesture) => event.nativeEvent.touches.length < 2 && Math.abs(gesture.dx) + Math.abs(gesture.dy) > 2,
         onPanResponderTerminationRequest: (event) => event.nativeEvent.touches.length > 1,
         onPanResponderGrant: () => {
+          holdDecoration(true);
           selectRef.current(live.current.id);
           origin.current = { x: live.current.x, y: live.current.y, scale: live.current.scale };
         },
+        onPanResponderRelease: () => holdDecoration(false),
+        onPanResponderTerminate: () => holdDecoration(false),
         onPanResponderMove: (_, gesture) => {
           const width = sizeRef.current.w || 1;
           const height = sizeRef.current.h || 1;
@@ -68,8 +72,11 @@ function PlacedSticker({
         onStartShouldSetPanResponder: () => true,
         onMoveShouldSetPanResponder: () => true,
         onPanResponderGrant: () => {
+          holdDecoration(true);
           origin.current = { x: live.current.x, y: live.current.y, scale: live.current.scale };
         },
+        onPanResponderRelease: () => holdDecoration(false),
+        onPanResponderTerminate: () => holdDecoration(false),
         onPanResponderMove: (_, gesture) => {
           changeRef.current({
             ...live.current,

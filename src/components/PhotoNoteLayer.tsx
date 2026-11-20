@@ -1,6 +1,7 @@
 import { useMemo, useRef, type ReactNode } from 'react';
 import { Image, PanResponder, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { holdDecoration } from '../logic/pageGesture';
 import type { NotePlacement, NoteStyle, PhotoFrame, PhotoPlacement } from '../models/types';
 import { useTheme } from '../theme/BookTheme';
 import { fontById } from '../theme/fonts';
@@ -9,6 +10,10 @@ const BASE = 110;
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+function fadeInk(color: string) {
+  return /^#[0-9A-Fa-f]{6}$/.test(color) ? `${color}80` : color;
 }
 
 function frameStyle(frame: PhotoFrame) {
@@ -71,9 +76,12 @@ function PlacedBox({
         onMoveShouldSetPanResponder: (event, gesture) => event.nativeEvent.touches.length < 2 && Math.abs(gesture.dx) + Math.abs(gesture.dy) > 2,
         onPanResponderTerminationRequest: (event) => event.nativeEvent.touches.length > 1,
         onPanResponderGrant: () => {
+          holdDecoration(true);
           selectRef.current();
           origin.current = { ...live.current };
         },
+        onPanResponderRelease: () => holdDecoration(false),
+        onPanResponderTerminate: () => holdDecoration(false),
         onPanResponderMove: (_, gesture) => {
           const width = sizeRef.current.w || 1;
           const height = sizeRef.current.h || 1;
@@ -93,8 +101,11 @@ function PlacedBox({
         onStartShouldSetPanResponder: () => true,
         onMoveShouldSetPanResponder: () => true,
         onPanResponderGrant: () => {
+          holdDecoration(true);
           origin.current = { ...live.current };
         },
+        onPanResponderRelease: () => holdDecoration(false),
+        onPanResponderTerminate: () => holdDecoration(false),
         onPanResponderMove: (_, gesture) => {
           moveRef.current({ ...live.current, scale: clamp(origin.current.scale + gesture.dx / 90, 0.45, 2.6) });
         },
@@ -192,11 +203,13 @@ export function PhotoNoteLayer({
                   onFocus={() => onEditing(true)}
                   onBlur={() => onEditing(false)}
                   multiline
+                  placeholder="A little note"
+                  placeholderTextColor={fadeInk(note.inkColor || theme.colors.paperInk)}
                   style={{ color: note.inkColor || theme.colors.paperInk, fontFamily: font?.script ?? theme.script, fontSize: 16, minWidth: 80 }}
                 />
               ) : (
                 <Pressable onPress={() => onSelect(note.id)}>
-                  <Text style={{ color: note.inkColor || theme.colors.paperInk, fontFamily: font?.script ?? theme.script, fontSize: 16 }}>{note.text || 'Note'}</Text>
+                  <Text style={{ color: note.text ? note.inkColor || theme.colors.paperInk : fadeInk(note.inkColor || theme.colors.paperInk), fontFamily: font?.script ?? theme.script, fontSize: 16, opacity: note.text ? 1 : 0.5 }}>{note.text || 'A little note'}</Text>
                 </Pressable>
               )}
             </View>

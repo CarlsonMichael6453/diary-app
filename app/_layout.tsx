@@ -16,6 +16,7 @@ import { IBMPlexMono_400Regular, IBMPlexMono_500Medium, IBMPlexMono_700Bold } fr
 import { Lora_400Regular, Lora_600SemiBold, Lora_700Bold } from '@expo-google-fonts/lora';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -79,6 +80,7 @@ export default function RootLayout() {
   if ((!loaded && !error) || !hydrated) return null;
 
   return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
     <SafeAreaProvider>
       <BookThemeProvider>
         <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
@@ -90,5 +92,6 @@ export default function RootLayout() {
         <WelcomeOverlay />
       </BookThemeProvider>
     </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

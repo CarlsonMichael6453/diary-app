@@ -1,7 +1,7 @@
 import { usePathname } from 'expo-router';
 import { useEffect, useRef } from 'react';
 
-import { playPageTurn } from '../services/sounds';
+import { playRouteTurn } from '../services/sounds';
 
 /** Page-turn sound when the reader moves between tabs and screens. */
 export function SoundRoutes() {
@@ -13,7 +13,8 @@ export function SoundRoutes() {
       first.current = false;
       return;
     }
-    playPageTurn();
+    if (path.includes('/entry')) return;
+    playRouteTurn();
   }, [path]);
 
   return null;

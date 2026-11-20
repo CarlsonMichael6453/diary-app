@@ -48,6 +48,20 @@ export function canPlaySound(kind: SoundKind, prefs: SoundPrefs): boolean {
   return true;
 }
 
+/** One id per completed turn. A disabled page channel yields nothing, and nothing is dropped for being fast. */
+export function pageTurnsForCommits(count: number, prefs: SoundPrefs, random: () => number = Math.random): string[] {
+  const played: string[] = [];
+  let previous: string | null = null;
+  for (let i = 0; i < count; i += 1) {
+    if (!canPlaySound('page', prefs)) continue;
+    const id = pickPageSound(PAGE_SOUND_IDS, previous, random);
+    if (!id) continue;
+    played.push(id);
+    previous = id;
+  }
+  return played;
+}
+
 /** Picks a page-turn clip, skipping the one that just played when another exists. */
 export function pickPageSound(ids: readonly string[], previous: string | null, random: () => number = Math.random): string {
   if (ids.length === 0) return '';

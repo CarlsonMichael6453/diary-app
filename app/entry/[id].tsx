@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams, type Href } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BackHandler, Image, PanResponder, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { BackHandler, PanResponder, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BuddyView } from '@/src/buddies/BuddyView';
@@ -8,6 +8,7 @@ import { getBuddy } from '@/src/buddies/catalog';
 import { EntryExtras } from '@/src/components/EntryExtras';
 import { MoodPicker } from '@/src/components/MoodPicker';
 import { FontFields } from '@/src/components/FontFields';
+import { PhotoNoteLayer } from '@/src/components/PhotoNoteLayer';
 import { PageFlip, type PageFlipHandle } from '@/src/components/PageFlip';
 import { Paper } from '@/src/components/Paper';
 import { Screen } from '@/src/components/Screen';
@@ -23,10 +24,12 @@ import { addDays, formatLong, todayKey } from '@/src/logic/dates';
 import { uid } from '@/src/logic/id';
 import { writingStreak } from '@/src/logic/streak';
 import { claimHorizontalSwipe, releaseSwipe } from '@/src/logic/swipe';
-import type { DiaryEntry, StickerPlacement } from '@/src/models/types';
+import { collageSlots, type CollagePreset } from '@/src/logic/collage';
+import { PAGE_TEXT_ID, reorderStack, type LayerMove } from '@/src/logic/layers';
+import type { DiaryEntry, NotePlacement, PhotoFrame, PhotoPlacement, StickerPlacement } from '@/src/models/types';
 import { lightTap } from '@/src/services/haptics';
 import { playPageTurn } from '@/src/services/sounds';
-import { pickDiaryPhoto } from '@/src/services/photos';
+import { pickDiaryPhotos, takeDiaryPhoto } from '@/src/services/photos';
 import { useDiary } from '@/src/store/useDiary';
 import { PACKS, stickersInPack } from '@/src/stickers/catalog';
 import { StickerView } from '@/src/stickers/StickerView';
@@ -42,6 +45,10 @@ type Draft = {
   body: string;
   mood: MoodId;
   photos: string[];
+  photoPlacements: PhotoPlacement[];
+  notes: NotePlacement[];
+  textZ: number;
+  photoOnly: boolean;
   stickers: StickerPlacement[];
   themeOverride: ThemeId | null;
   design?: ColorDesign | null;
@@ -59,7 +66,7 @@ type Draft = {
 };
 
 function blank(date: string, bookId: string): Draft {
-  return { id: uid('page'), date, title: '', body: '', mood: 'calm', photos: [], stickers: [], themeOverride: null, createdAt: Date.now(), bookId, tags: [], activities: [] };
+  return { id: uid('page'), date, title: '', body: '', mood: 'calm', photos: [], photoPlacements: [], notes: [], textZ: 10, photoOnly: false, stickers: [], themeOverride: null, createdAt: Date.now(), bookId, tags: [], activities: [] };
 }
 
 function fromEntry(entry: DiaryEntry): Draft {
@@ -70,6 +77,10 @@ function fromEntry(entry: DiaryEntry): Draft {
     body: entry.body,
     mood: entry.mood,
     photos: entry.photos,
+    photoPlacements: entry.photoPlacements ?? entry.photos.map((uri, index) => ({ id: `photo-${entry.id}-${index}`, uri, x: 0.22 + (index % 3) * 0.28, y: 0.72, scale: 0.9, rotation: 0, frame: 'none' as const, z: 20 + index })),
+    notes: entry.notes ?? [],
+    textZ: entry.textZ ?? 10,
+    photoOnly: entry.photoOnly ?? false,
     stickers: entry.stickers,
     themeOverride: entry.themeOverride,
     design: entry.design,
@@ -269,7 +280,7 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
   );
 
   function pageNeedsSave(latest: Draft): boolean {
-  const content = latest.title.trim() || latest.body.trim() || latest.photos.length > 0 || latest.stickers.length > 0 || latest.themeOverride || latest.design || latest.fontId || latest.inkColor;
+  const content = latest.title.trim() || latest.body.trim() || latest.photos.length > 0 || latest.stickers.length > 0 || latest.photoPlacements.length > 0 || latest.notes.length > 0 || latest.photoOnly || latest.themeOverride || latest.design || latest.fontId || latest.inkColor;
   const stored = useDiary.getState().entries.find((entry) => entry.id === latest.id);
   const lookChanged = Boolean(stored) && ((stored?.themeOverride ?? null) !== (latest.themeOverride ?? null) || JSON.stringify(stored?.design ?? null) !== JSON.stringify(latest.design ?? null) || (stored?.fontId ?? null) !== (latest.fontId ?? null) || (stored?.inkColor ?? null) !== (latest.inkColor ?? null));
   return Boolean(content || lookChanged);
@@ -279,7 +290,63 @@ function updateSticker(next: StickerPlacement) {
     setDraft({ ...draft, stickers: draft.stickers.map((item) => (item.id === next.id ? next : item)) });
   }
 
+  function nextZ(): number {
+    const values = [draft.textZ, ...draft.stickers.map((item) => item.z ?? 0), ...draft.photoPlacements.map((item) => item.z ?? 0), ...draft.notes.map((item) => item.z ?? 0)];
+    return Math.max(...values) + 1;
+  }
+
+  function moveLayer(id: string, move: LayerMove) {
+    const items = [
+      { id: PAGE_TEXT_ID, z: draft.textZ },
+      ...draft.stickers.map((item) => ({ id: item.id, z: item.z ?? draft.textZ + 1 })),
+      ...draft.photoPlacements.map((item) => ({ id: item.id, z: item.z ?? draft.textZ + 1 })),
+      ...draft.notes.map((item) => ({ id: item.id, z: item.z ?? draft.textZ + 1 })),
+    ];
+    const stacked = reorderStack(items, id, move);
+    const zOf = (itemId: string) => stacked.find((item) => item.id === itemId)?.z ?? 0;
+    setDraft({
+      ...draft,
+      textZ: zOf(PAGE_TEXT_ID),
+      stickers: draft.stickers.map((item) => ({ ...item, z: zOf(item.id) })),
+      photoPlacements: draft.photoPlacements.map((item) => ({ ...item, z: zOf(item.id) })),
+      notes: draft.notes.map((item) => ({ ...item, z: zOf(item.id) })),
+    });
+  }
+
+  async function addPhotos(uris: string[]) {
+    const room = Math.max(0, 12 - draft.photoPlacements.length);
+    const take = uris.slice(0, room);
+    if (take.length === 0) {
+      setToast('This page already has twelve photos.');
+      return;
+    }
+    const slots = collageSlots('grid', draft.photoPlacements.length + take.length).slice(draft.photoPlacements.length);
+    const placed: PhotoPlacement[] = take.map((uri, index) => ({
+      id: uid('photo'),
+      uri,
+      ...slots[index],
+      z: nextZ() + index,
+    }));
+    setDraft({
+      ...draft,
+      photos: [...draft.photos, ...take],
+      photoPlacements: [...draft.photoPlacements, ...placed],
+    });
+    setSelectedId(placed[0]?.id ?? null);
+  }
+
+  function applyCollage(preset: CollagePreset) {
+    const slots = collageSlots(preset, draft.photoPlacements.length);
+    setDraft({
+      ...draft,
+      photoPlacements: draft.photoPlacements.map((photo, index) => ({ ...photo, ...slots[index] })),
+    });
+  }
+
   const selected = draft.stickers.find((item) => item.id === selectedId) ?? null;
+  const selectedPhoto = draft.photoPlacements.find((item) => item.id === selectedId) ?? null;
+  const selectedNote = draft.notes.find((item) => item.id === selectedId) ?? null;
+  const selectedLayer = selectedId;
   const padding = {
     paddingTop: perch === 'tr' || perch === 'banner' ? 108 : 18,
     paddingBottom: perch === 'br' || perch === 'bl' ? 130 : 24,
@@ -299,7 +366,7 @@ function updateSticker(next: StickerPlacement) {
         <PageFlip ref={flipRef} flipKey={`${draft.id}:${draft.date}`}>
         <View {...swipe.panHandlers} onLayout={(event) => setPageSize({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height })}>
           <Paper style={{ minHeight: 640 }}>
-            <View pointerEvents={decorate ? 'none' : 'auto'} style={[padding, { zIndex: decorate ? 0 : 3 }]}>
+            <View pointerEvents={decorate ? 'none' : 'auto'} style={[padding, { zIndex: 80, position: 'relative', paddingBottom: 0 }]}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Pressable accessibilityLabel="Previous page" onPress={() => stepEntry(-1)}><Text style={{ color: theme.colors.paperInk, fontSize: 20 }}>‹</Text></Pressable>
                 <Text style={{ color: theme.colors.paperSoft, fontFamily: theme.body }}>{formatLong(draft.date)}</Text>
@@ -308,68 +375,61 @@ function updateSticker(next: StickerPlacement) {
               <Text style={{ color: theme.colors.paperInk, fontFamily: theme.script, fontSize: 22, marginTop: 8 }}>{prompt}</Text>
               <MoodPicker value={draft.mood} onChange={(mood) => setDraft({ ...draft, mood })} />
               <EntryExtras isNew={!saved} draft={draft} onChange={(patch) => setDraft({ ...draft, ...patch })} />
-              <TextInput
-                value={draft.title}
-                onChangeText={(title) => setDraft({ ...draft, title })}
-                onFocus={() => setEditing(true)}
-                onBlur={() => setEditing(false)}
-                placeholder="Title"
-                placeholderTextColor={theme.colors.paperSoft}
-                editable={!decorate}
-                style={{ color: theme.colors.paperInk, fontFamily: theme.script, fontSize: 34, marginTop: 8 }}
-              />
-              <TextInput
-                value={draft.body}
-                onChangeText={(body) => setDraft({ ...draft, body })}
-                onFocus={() => setEditing(true)}
-                onBlur={() => setEditing(false)}
-                placeholder="Write the page…"
-                placeholderTextColor={theme.colors.paperSoft}
-                multiline
-                editable={!decorate}
-                style={{ color: theme.colors.paperInk, fontFamily: theme.body, fontSize: 17, lineHeight: 28, minHeight: 220, textAlignVertical: 'top' }}
-              />
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 8 }}>
-                {draft.photos.map((uri) => (
-                  <Pressable key={uri.slice(0, 32)} onPress={() => setDraft({ ...draft, photos: draft.photos.filter((item) => item !== uri) })}>
-                    <View style={{ backgroundColor: '#fff', padding: 6, paddingBottom: 16, transform: [{ rotate: '-2deg' }] }}>
-                      <Image source={{ uri }} style={{ width: 96, height: 96 }} />
-                    </View>
-                  </Pressable>
-                ))}
-                {draft.photos.length < 4 ? (
-                  <Pressable
-                    onPress={async () => {
-                      const result = await pickDiaryPhoto();
-                      if ('error' in result) {
-                        if (result.error) setToast(result.error);
-                        return;
-                      }
-                      setDraft({ ...draft, photos: [...draft.photos, result.uri] });
-                    }}
-                    style={{ width: 96, height: 120, borderWidth: 1.5, borderStyle: 'dashed', borderColor: theme.colors.paperEdge, alignItems: 'center', justifyContent: 'center', borderRadius: 8 }}
-                  >
-                    <Text style={{ color: theme.colors.paperSoft, fontFamily: theme.body, textAlign: 'center' }}>Add a photo</Text>
-                  </Pressable>
-                ) : null}
-              </ScrollView>
+              {draft.photoOnly ? <Text style={{ color: theme.colors.paperSoft, fontFamily: theme.body, marginTop: 12 }}>Photo page</Text> : null}
             </View>
-            <View pointerEvents="box-none" style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: decorate ? 5 : 1 }}>
+            {draft.photoOnly ? null : (
+              <View pointerEvents={decorate ? 'none' : 'auto'} style={{ zIndex: 12, position: 'relative', paddingLeft: padding.paddingLeft, paddingRight: padding.paddingRight, paddingBottom: padding.paddingBottom }}>
+                <TextInput
+                  value={draft.title}
+                  onChangeText={(title) => setDraft({ ...draft, title })}
+                  onFocus={() => setEditing(true)}
+                  onBlur={() => setEditing(false)}
+                  placeholder="Title"
+                  placeholderTextColor={theme.colors.paperSoft}
+                  editable={!decorate}
+                  style={{ color: theme.colors.paperInk, fontFamily: theme.script, fontSize: 34, marginTop: 8 }}
+                />
+                <TextInput
+                  value={draft.body}
+                  onChangeText={(body) => setDraft({ ...draft, body })}
+                  onFocus={() => setEditing(true)}
+                  onBlur={() => setEditing(false)}
+                  placeholder="Write the page…"
+                  placeholderTextColor={theme.colors.paperSoft}
+                  multiline
+                  editable={!decorate}
+                  style={{ color: theme.colors.paperInk, fontFamily: theme.body, fontSize: 17, lineHeight: 28, minHeight: 220, textAlignVertical: 'top' }}
+                />
+              </View>
+            )}
             <StickerLayer
               stickers={draft.stickers}
               width={pageSize.width}
               height={pageSize.height}
               decorate={decorate}
               selectedId={selectedId}
+              textZ={draft.textZ}
               onSelect={setSelectedId}
               onChange={updateSticker}
             />
-            </View>
+            <PhotoNoteLayer
+              photos={draft.photoPlacements}
+              notes={draft.notes}
+              width={pageSize.width}
+              height={pageSize.height}
+              textZ={draft.textZ}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onChangePhoto={(next) => setDraft({ ...draft, photoPlacements: draft.photoPlacements.map((item) => (item.id === next.id ? next : item)) })}
+              onChangeNote={(next) => setDraft({ ...draft, notes: draft.notes.map((item) => (item.id === next.id ? next : item)) })}
+              onEditNote={(id, text) => setDraft({ ...draft, notes: draft.notes.map((item) => (item.id === id ? { ...item, text } : item)) })}
+              onEditing={setEditing}
+            />
             {buddy ? (
               <View
                 pointerEvents="box-none"
                 style={[
-                  { zIndex: 6 },
+                  { zIndex: 90 },
                   perch === 'tr'
                     ? { position: 'absolute', top: 0, right: 4 }
                     : perch === 'tl'
@@ -440,13 +500,81 @@ function updateSticker(next: StickerPlacement) {
             <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, fontSize: 12 }}>Drag a sticker. Empty page scrolls. Two fingers scroll too.</Text>
             <Button label="Done" onPress={() => setDecorate(false)} />
           </View>
-          {selected ? (
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 4 }}>
-              <Button label="Smaller" tone="ghost" onPress={() => updateSticker({ ...selected, scale: Math.max(0.45, selected.scale / 1.12) })} />
-              <Button label="Bigger" tone="ghost" onPress={() => updateSticker({ ...selected, scale: Math.min(2.3, selected.scale * 1.12) })} />
-              <Button label="Rotate" tone="ghost" onPress={() => updateSticker({ ...selected, rotation: (selected.rotation + 15) % 360 })} />
-              <Button label="Remove" tone="danger" onPress={() => { setDraft({ ...draft, stickers: draft.stickers.filter((item) => item.id !== selected.id) }); setSelectedId(null); }} />
+          {selectedLayer ? (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
+              <Button label="Front" tone="ghost" onPress={() => moveLayer(selectedLayer, 'front')} />
+              <Button label="Forward" tone="ghost" onPress={() => moveLayer(selectedLayer, 'forward')} />
+              <Button label="Backward" tone="ghost" onPress={() => moveLayer(selectedLayer, 'backward')} />
+              <Button label="Back" tone="ghost" onPress={() => moveLayer(selectedLayer, 'back')} />
+              {selected ? (
+                <>
+                  <Button label="Smaller" tone="ghost" onPress={() => updateSticker({ ...selected, scale: Math.max(0.45, selected.scale / 1.12) })} />
+                  <Button label="Bigger" tone="ghost" onPress={() => updateSticker({ ...selected, scale: Math.min(2.3, selected.scale * 1.12) })} />
+                  <Button label="Rotate" tone="ghost" onPress={() => updateSticker({ ...selected, rotation: (selected.rotation + 15) % 360 })} />
+                  <Button label="Remove" tone="danger" onPress={() => { setDraft({ ...draft, stickers: draft.stickers.filter((item) => item.id !== selected.id) }); setSelectedId(null); }} />
+                </>
+              ) : null}
+              {selectedPhoto ? (
+                <>
+                  <Button label="Frame" tone="ghost" onPress={() => {
+                    const frames: PhotoFrame[] = ['none', 'polaroid', 'tape', 'round'];
+                    const frame = frames[(frames.indexOf(selectedPhoto.frame) + 1) % frames.length];
+                    setDraft({ ...draft, photoPlacements: draft.photoPlacements.map((item) => (item.id === selectedPhoto.id ? { ...item, frame } : item)) });
+                  }} />
+                  <Button label="Remove" tone="danger" onPress={() => setDraft({ ...draft, photoPlacements: draft.photoPlacements.filter((item) => item.id !== selectedPhoto.id), photos: draft.photoPlacements.filter((item) => item.id !== selectedPhoto.id).map((item) => item.uri) })} />
+                </>
+              ) : null}
+              {selectedNote ? (
+                <>
+                  <Button label="Style" tone="ghost" onPress={() => {
+                    const styles = ['none', 'sticky', 'bubble', 'tag', 'torn', 'highlight'] as const;
+                    const style = styles[(styles.indexOf(selectedNote.style) + 1) % styles.length];
+                    setDraft({ ...draft, notes: draft.notes.map((item) => (item.id === selectedNote.id ? { ...item, style } : item)) });
+                  }} />
+                  <Button label="Remove" tone="danger" onPress={() => { setDraft({ ...draft, notes: draft.notes.filter((item) => item.id !== selectedNote.id) }); setSelectedId(null); }} />
+                </>
+              ) : null}
             </View>
+          ) : null}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 6 }}>
+            <Button label="Photos" tone="ghost" onPress={async () => {
+              const result = await pickDiaryPhotos();
+              if ('error' in result) {
+                if (result.error) setToast(result.error);
+                return;
+              }
+              await addPhotos(result.uris);
+            }} />
+            <Button label="Camera" tone="ghost" onPress={async () => {
+              const result = await takeDiaryPhoto();
+              if ('error' in result) {
+                if (result.error) setToast(result.error);
+                return;
+              }
+              await addPhotos([result.uri]);
+            }} />
+            <Button label="Note" tone="ghost" onPress={() => {
+              const note: NotePlacement = { id: uid('note'), text: 'A little note', x: 0.5, y: 0.55, scale: 1, rotation: -4, style: 'sticky', fontId: draft.fontId, inkColor: draft.inkColor, z: nextZ() };
+              setDraft({ ...draft, notes: [...draft.notes, note] });
+              setSelectedId(note.id);
+            }} />
+            <Button label={draft.photoOnly ? 'Add writing' : 'Photo page'} tone="ghost" onPress={() => setDraft({ ...draft, photoOnly: !draft.photoOnly })} />
+            {(['two', 'three', 'grid', 'scatter', 'full'] as const).map((preset) => (
+              <Button key={preset} label={preset === 'two' ? '2-up' : preset === 'three' ? '3-up' : preset === 'grid' ? 'Grid' : preset === 'scatter' ? 'Scatter' : 'Full'} tone="ghost" onPress={() => applyCollage(preset)} />
+            ))}
+            <Button label="Page text" tone={selectedId === PAGE_TEXT_ID ? 'primary' : 'ghost'} onPress={() => setSelectedId(PAGE_TEXT_ID)} />
+          </ScrollView>
+          {selectedNote ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
+              {FONT_CHOICES.map((font) => (
+                <Pressable key={font.id} onPress={() => setDraft({ ...draft, notes: draft.notes.map((item) => (item.id === selectedNote.id ? { ...item, fontId: font.id } : item)) })} style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: selectedNote.fontId === font.id ? theme.colors.accent : theme.colors.chip }}>
+                  <Text style={{ color: selectedNote.fontId === font.id ? theme.colors.onAccent : theme.colors.chipInk, fontFamily: font.script }}>{font.name}</Text>
+                </Pressable>
+              ))}
+              {INK_SWATCHES.slice(0, 12).map((hex) => (
+                <Pressable key={hex} accessibilityLabel={`Note ink ${hex}`} onPress={() => setDraft({ ...draft, notes: draft.notes.map((item) => (item.id === selectedNote.id ? { ...item, inkColor: hex } : item)) })} style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: hex, borderWidth: selectedNote.inkColor === hex ? 2 : 0, borderColor: theme.colors.accent }} />
+              ))}
+            </ScrollView>
           ) : null}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
             {listedPacks.map((pack) => (
@@ -485,6 +613,7 @@ function updateSticker(next: StickerPlacement) {
                       y: 0.42 + Math.random() * 0.2,
                       scale: 1,
                       rotation: Math.round(Math.random() * 20 - 10),
+                      z: nextZ(),
                     };
                     setDraft({ ...draft, stickers: [...draft.stickers, placed] });
                     setSelectedId(placed.id);

@@ -512,6 +512,7 @@ export function BuddyView({
   const bob = useRef(new Animated.Value(0)).current;
   const reaction = `${ctx.mood}|${ctx.celebrate ? 1 : 0}|${ctx.writing ? 1 : 0}|${ctx.finished ? 1 : 0}|${ctx.streak}`;
   const skipReaction = useRef(true);
+  const lastMood = useRef(ctx.mood);
 
   useEffect(() => {
     if (reduceMotion) return;
@@ -529,10 +530,15 @@ export function BuddyView({
   useEffect(() => {
     if (skipReaction.current) {
       skipReaction.current = false;
+      lastMood.current = ctx.mood;
+      return;
+    }
+    if (lastMood.current !== ctx.mood) {
+      lastMood.current = ctx.mood;
       return;
     }
     playBuddySound(buddyId);
-  }, [reaction, buddyId]);
+  }, [reaction, buddyId, ctx.mood]);
 
   if (!buddy) return null;
   const Draw = BUDDY_DRAW[buddy.id];

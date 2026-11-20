@@ -9,6 +9,35 @@ export type StickerPlacement = {
   y: number;
   scale: number;
   rotation: number;
+  z?: number;
+};
+
+export type PhotoFrame = 'none' | 'polaroid' | 'tape' | 'round';
+
+export type PhotoPlacement = {
+  id: string;
+  uri: string;
+  x: number;
+  y: number;
+  scale: number;
+  rotation: number;
+  frame: PhotoFrame;
+  z?: number;
+};
+
+export type NoteStyle = 'none' | 'sticky' | 'bubble' | 'tag' | 'torn' | 'highlight';
+
+export type NotePlacement = {
+  id: string;
+  text: string;
+  x: number;
+  y: number;
+  scale: number;
+  rotation: number;
+  style: NoteStyle;
+  fontId?: string | null;
+  inkColor?: string | null;
+  z?: number;
 };
 
 export type DiaryBook = {
@@ -27,6 +56,10 @@ export type DiaryEntry = {
   body: string;
   mood: MoodId;
   photos: string[];
+  photoPlacements?: PhotoPlacement[];
+  notes?: NotePlacement[];
+  textZ?: number;
+  photoOnly?: boolean;
   stickers: StickerPlacement[];
   themeOverride: ThemeId | null;
   design?: ColorDesign | null;

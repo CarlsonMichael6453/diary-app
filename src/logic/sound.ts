@@ -13,7 +13,13 @@ export const BUDDY_SOUND_IDS = [
   'lumi',
 ] as const;
 
-export const PAGE_SOUND_IDS = ['flip-1', 'flip-2', 'flip-3', 'flip-4', 'flip-5', 'flip-6'] as const;
+export const PAGE_SOUND_IDS = [
+  'real-1-slow-journal',
+  'real-2-journal-rustle',
+  'real-4-book-page-turn',
+  'real-5-book-page-flip',
+  'real-6-heavy-sketchbook',
+] as const;
 
 export type SoundKind = 'buddy' | 'page';
 

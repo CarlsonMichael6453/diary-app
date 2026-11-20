@@ -107,16 +107,10 @@ export const PageFlip = forwardRef<
       playCurlCommit();
       return;
     }
-    side.value = -1;
-    fingerX.value = 0;
-    fingerY.value = (height.value || 400) / 2;
-    fingerX.value = withTiming(w, { duration: 420, easing: Easing.out(Easing.cubic) }, (finished) => {
-      if (finished) {
-        side.value = 0;
-        runOnJS(playCurlCommit)();
-      }
-    });
-  }, [flipKey, pageW, fingerX, fingerY, height, reduce, side, width]);
+    side.value = 0;
+    fingerX.value = w;
+    playCurlCommit();
+  }, [flipKey, pageW, fingerX, side, width]);
 
   useImperativeHandle(ref, () => ({
     cancel() {
@@ -222,57 +216,35 @@ export const PageFlip = forwardRef<
   const currentStyle = useAnimatedStyle(() => {
     const w = width.value || 1;
     const h = height.value || 1;
-    if (reduceSV.value || side.value !== -1) return { width: w, transform: [{ translateX: 0 }, { translateY: 0 }, { rotate: '0deg' }] };
-    const fold = fingerX.value;
-    const angle = foldAngle(fingerY.value, h);
+    if (reduceSV.value || side.value !== -1) return { width: w };
+    const layout = curlLayout(fingerX.value, fingerY.value, w, h, 'next');
+    if (Platform.OS !== 'web') return { width: Math.max(0, layout.foldX) };
+    const slope = Math.tan((layout.angle * Math.PI) / 180);
+    const x0 = layout.foldX + (0 - fingerY.value) * slope;
+    const x1 = layout.foldX + (h - fingerY.value) * slope;
     return {
-      width: Math.max(0, fold),
-      transform: [
-        { translateX: fold / 2 },
-        { translateY: fingerY.value - h / 2 },
-        { rotate: `${angle}deg` },
-        { translateX: -fold / 2 },
-        { translateY: -(fingerY.value - h / 2) },
-      ],
-    };
-  });
-
-  const uprightStyle = useAnimatedStyle(() => {
-    const w = width.value || 1;
-    const h = height.value || 1;
-    if (reduceSV.value || side.value !== -1) return { transform: [{ translateX: 0 }, { translateY: 0 }, { rotate: '0deg' }] };
-    const fold = fingerX.value;
-    const angle = foldAngle(fingerY.value, h);
-    return {
-      transform: [
-        { translateX: fold - w / 2 },
-        { translateY: fingerY.value - h / 2 },
-        { rotate: `${-angle}deg` },
-        { translateX: -(fold - w / 2) },
-        { translateY: -(fingerY.value - h / 2) },
-      ],
+      width: w,
+      clipPath: `polygon(0px 0px, ${x0}px 0px, ${x1}px ${h}px, 0px ${h}px)`,
     };
   });
 
   const prevStyle = useAnimatedStyle(() => {
+    const w = width.value || 1;
     const h = height.value || 1;
-    if (reduceSV.value || side.value !== 1) return { width: 0, opacity: 0, transform: [{ translateX: 0 }, { translateY: 0 }, { rotate: '0deg' }] };
-    const fold = fingerX.value;
-    const angle = foldAngle(fingerY.value, h);
+    if (reduceSV.value || side.value !== 1) return { width: 0, opacity: 0 };
+    const layout = curlLayout(fingerX.value, fingerY.value, w, h, 'prev');
+    if (Platform.OS !== 'web') return { opacity: 1, width: Math.max(0, layout.foldX) };
+    const slope = Math.tan((layout.angle * Math.PI) / 180);
+    const x0 = layout.foldX + (0 - fingerY.value) * slope;
+    const x1 = layout.foldX + (h - fingerY.value) * slope;
     return {
       opacity: 1,
-      width: Math.max(0, fold),
-      transform: [
-        { translateX: fold / 2 },
-        { translateY: fingerY.value - h / 2 },
-        { rotate: `${angle}deg` },
-        { translateX: -fold / 2 },
-        { translateY: -(fingerY.value - h / 2) },
-      ],
+      width: w,
+      clipPath: `polygon(0px 0px, ${x0}px 0px, ${x1}px ${h}px, 0px ${h}px)`,
     };
   });
 
-  const curlStyle = useAnimatedStyle(() => {
+  const foldStyle = useAnimatedStyle(() => {
     const w = width.value || 1;
     const h = height.value || 1;
     const which = side.value < 0 ? 'next' : side.value > 0 ? 'prev' : 'flat';
@@ -280,8 +252,8 @@ export const PageFlip = forwardRef<
     if (reduceSV.value || layout.side === 'flat') return { opacity: 0, width: 0 };
     return {
       opacity: 1,
-      left: layout.curlLeft,
-      width: layout.curlWidth,
+      left: layout.foldX - 8,
+      width: 16,
       transform: [
         { translateY: fingerY.value - h / 2 },
         { rotate: `${layout.angle}deg` },
@@ -290,32 +262,22 @@ export const PageFlip = forwardRef<
     };
   });
 
-  const shadeStyle = useAnimatedStyle(() => {
+  const shadowStyle = useAnimatedStyle(() => {
     const w = width.value || 1;
     const h = height.value || 1;
     const which = side.value < 0 ? 'next' : side.value > 0 ? 'prev' : 'flat';
     const layout = curlLayout(fingerX.value, fingerY.value, w, h, which);
     if (reduceSV.value || layout.side === 'flat') return { opacity: 0, width: 0 };
     return {
-      opacity: 1,
-      left: layout.shadeLeft,
-      width: layout.shadeWidth,
+      opacity: 0.9,
+      left: layout.foldX + 6,
+      width: 28,
       transform: [
         { translateY: fingerY.value - h / 2 },
         { rotate: `${layout.angle}deg` },
-        { scaleX: layout.side === 'prev' ? -1 : 1 },
         { translateY: -(fingerY.value - h / 2) },
       ],
     };
-  });
-
-  const dropStyle = useAnimatedStyle(() => {
-    const w = width.value || 1;
-    const h = height.value || 1;
-    const which = side.value < 0 ? 'next' : side.value > 0 ? 'prev' : 'flat';
-    const layout = curlLayout(fingerX.value, fingerY.value, w, h, which);
-    if (reduceSV.value || layout.side === 'flat') return { opacity: 0, width: 0 };
-    return { opacity: 0.9, left: layout.dropLeft, width: layout.dropWidth };
   });
 
   const boxRef = useRef<any>(null);
@@ -419,19 +381,16 @@ export const PageFlip = forwardRef<
         <View pointerEvents="none" style={StyleSheet.absoluteFill}>{nextSheet}</View>
         <Animated.View style={fadeStyle}>
           <Animated.View style={[{ overflow: 'hidden' }, currentStyle]}>
-            <Animated.View style={[{ width: pageW || '100%' }, uprightStyle]}>{children}</Animated.View>
+            <View style={{ width: pageW || '100%' }}>{children}</View>
           </Animated.View>
         </Animated.View>
         <Animated.View pointerEvents="none" style={[styles.prev, prevStyle]}>
           <View style={{ width: pageW || '100%' }}>{prevSheet}</View>
         </Animated.View>
-        <Animated.View pointerEvents="none" style={[styles.band, shadeStyle]}>
-          <LinearGradient colors={['rgba(40,24,28,0)', 'rgba(40,24,28,0.28)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+        <Animated.View pointerEvents="none" style={[styles.band, shadowStyle]}>
+          <LinearGradient colors={['rgba(28,16,20,0.28)', 'rgba(28,16,20,0)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
         </Animated.View>
-        <Animated.View pointerEvents="none" style={[styles.band, dropStyle]}>
-          <LinearGradient colors={['rgba(28,16,20,0.34)', 'rgba(28,16,20,0)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
-        </Animated.View>
-        <Animated.View pointerEvents="none" style={[styles.band, curlStyle, { backgroundColor: theme.colors.paper }]}>
+        <Animated.View pointerEvents="none" style={[styles.band, foldStyle, { backgroundColor: theme.colors.paper }]}>
           <LinearGradient colors={CURL_LIGHT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
         </Animated.View>
       </View>

@@ -93,6 +93,7 @@ export type Settings = {
   soundEnabled: boolean;
   buddySounds: boolean;
   pageSounds: boolean;
+  bookOpenMusic: boolean;
   soundVolume: number;
   lockOnOpen: boolean;
   books: DiaryBook[];

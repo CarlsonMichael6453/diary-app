@@ -144,6 +144,7 @@ export default function SettingsScreen() {
         <Button label={settings.soundEnabled ? 'Sound is on' : 'Sound is off'} tone={settings.soundEnabled ? 'primary' : 'ghost'} onPress={() => patchSettings({ soundEnabled: !settings.soundEnabled })} />
         <Button label={settings.buddySounds ? 'Pal sounds on' : 'Pal sounds off'} tone="ghost" onPress={() => patchSettings({ buddySounds: !settings.buddySounds })} />
         <Button label={settings.pageSounds ? 'Page turns on' : 'Page turns off'} tone="ghost" onPress={() => patchSettings({ pageSounds: !settings.pageSounds })} />
+        <Button label={settings.bookOpenMusic !== false ? 'Book opening music on' : 'Book opening music off'} tone="ghost" onPress={() => patchSettings({ bookOpenMusic: settings.bookOpenMusic === false })} />
         <FieldLabel>Volume</FieldLabel>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {[

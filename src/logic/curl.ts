@@ -1,5 +1,5 @@
-/** Diameter of the soft-curl cylinder, as a fraction of the page width. */
-export const CURL_DIAMETER = 0.16;
+/** Width of the paper fold, in pixels. Kept narrow so it reads as an edge, not a tube. */
+export const CURL_FOLD = 18;
 
 export type CurlLayout = {
   side: 'next' | 'prev' | 'flat';
@@ -22,14 +22,14 @@ export function foldAngle(fingerY: number, height: number): number {
   'worklet';
   const span = height > 1 ? height : 1;
   const ny = fingerY / span;
-  return Math.max(-22, Math.min(22, (ny - 0.5) * 36));
+  return Math.max(-12, Math.min(12, (ny - 0.5) * 28));
 }
 
 /** The curl edge is the finger x. There is no extra smoothing or dead zone here. */
 export function curlLayout(fingerX: number, fingerY: number, width: number, height: number, side: 'next' | 'prev' | 'flat'): CurlLayout {
   'worklet';
   const w = Math.max(0, width);
-  const diameter = w * CURL_DIAMETER;
+  const diameter = CURL_FOLD;
   const foldX = Math.max(0, Math.min(w, fingerX));
   const angle = foldAngle(fingerY, height);
   const empty: CurlLayout = {

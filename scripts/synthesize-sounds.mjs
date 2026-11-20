@@ -141,4 +141,32 @@ const plus = concat([
 ]);
 writeWav(join(root, 'plus', 'celebrate.wav'), plus);
 
-console.log(`wrote ${Object.keys(buddies).length} buddy sounds, ${Object.keys(moods).length} mood sounds, and the Plus chime`);
+function phrase(notes, { amp = 0.08, partial = 0.4, attack = 0.01, release = 0.2, gap = 0.05 } = {}) {
+  const parts = [];
+  for (const [freq, dur] of notes) {
+    parts.push(tone(freq, dur, { amp, partial, attack, release: Math.min(release, dur * 0.75) }));
+    parts.push(silence(gap));
+  }
+  return concat(parts);
+}
+
+const opens = {
+  cozy: phrase([[523, 0.34], [587, 0.28], [659, 0.32], [523, 0.3], [440, 0.36], [392, 0.4], [523, 0.55]], { amp: 0.075, partial: 0.5 }),
+  floral: phrase([[784, 0.22], [988, 0.22], [1175, 0.26], [880, 0.24], [784, 0.28], [1047, 0.36], [880, 0.4]], { amp: 0.07, partial: 0.55, gap: 0.06 }),
+  ocean: phrase([[392, 0.5], [494, 0.4], [587, 0.36], [523, 0.4], [440, 0.48], [349, 0.6]], { amp: 0.07, partial: 0.2, release: 0.3, gap: 0.02 }),
+  forest: phrase([[392, 0.2], [440, 0.2], [494, 0.24], [392, 0.22], [330, 0.28], [294, 0.34], [392, 0.4]], { amp: 0.09, partial: 0.15, attack: 0.004, release: 0.12, gap: 0.08 }),
+  night: phrase([[262, 0.7], [311, 0.4], [392, 0.45], [349, 0.4], [294, 0.55], [247, 0.7]], { amp: 0.07, partial: 0.25, release: 0.35, gap: 0.02 }),
+  retro: phrase([[349, 0.16], [440, 0.16], [523, 0.18], [659, 0.2], [523, 0.16], [440, 0.18], [349, 0.24], [523, 0.32], [440, 0.36]], { amp: 0.08, partial: 0.1, attack: 0.004, release: 0.08, gap: 0.04 }),
+  elegant: phrase([[1047, 0.18], [1319, 0.18], [1568, 0.22], [1175, 0.2], [1047, 0.24], [1319, 0.28], [784, 0.42]], { amp: 0.06, partial: 0.65, gap: 0.07 }),
+  christmas: phrase([[698, 0.16], [880, 0.18], [784, 0.16], [988, 0.2], [880, 0.16], [1175, 0.22], [988, 0.28], [784, 0.36]], { amp: 0.07, partial: 0.7, gap: 0.05 }),
+  halloween: phrase([[466, 0.22], [415, 0.2], [349, 0.26], [392, 0.18], [311, 0.3], [466, 0.24], [349, 0.4]], { amp: 0.075, partial: 0.45, gap: 0.06 }),
+  valentine: phrase([[659, 0.28], [784, 0.34], [659, 0.26], [880, 0.4], [784, 0.28], [659, 0.46]], { amp: 0.075, partial: 0.35, gap: 0.08 }),
+  festival: phrase([[523, 0.16], [659, 0.16], [784, 0.18], [1047, 0.22], [784, 0.16], [659, 0.18], [784, 0.22], [523, 0.4]], { amp: 0.08, partial: 0.3, gap: 0.04 }),
+  sunset: phrase([[440, 0.3], [494, 0.26], [587, 0.3], [659, 0.34], [587, 0.28], [494, 0.4], [440, 0.5]], { amp: 0.075, partial: 0.25, gap: 0.04 }),
+};
+
+for (const [id, samples] of Object.entries(opens)) {
+  writeWav(join(root, 'open', `${id}.wav`), samples);
+}
+
+console.log(`wrote ${Object.keys(buddies).length} buddy sounds, ${Object.keys(moods).length} mood sounds, the Plus chime, and ${Object.keys(opens).length} book-opening jingles`);

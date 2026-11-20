@@ -2,6 +2,7 @@ import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-aud
 import { Platform } from 'react-native';
 
 import type { MoodId } from '../data/moods';
+import { OPEN_FAMILIES, type OpenFamily } from '../logic/bookOpen';
 import { BUDDY_SOUND_IDS, PAGE_SOUND_IDS, canPlaySound, pickPageSound } from '../logic/sound';
 import { useDiary } from '../store/useDiary';
 
@@ -66,6 +67,7 @@ function takePagePlayer(id: (typeof PAGE_SOUND_IDS)[number]): AudioPlayer {
 /** Create the 15 page-turn players. On web, start them inside a user gesture so later flips are allowed to overlap. */
 export function primePageSounds(): void {
   ensurePagePool();
+  ensureOpenPool();
   if (pageSoundsPrimed) return;
   pageSoundsPrimed = true;
   if (Platform.OS !== 'web') return;
@@ -184,7 +186,50 @@ export function playRouteTurn(): boolean {
 
 const plusSource = require('../../assets/sounds/plus/celebrate.wav');
 
+const openSources: Record<OpenFamily, number> = {
+  cozy: require('../../assets/sounds/open/cozy.wav'),
+  floral: require('../../assets/sounds/open/floral.wav'),
+  ocean: require('../../assets/sounds/open/ocean.wav'),
+  forest: require('../../assets/sounds/open/forest.wav'),
+  night: require('../../assets/sounds/open/night.wav'),
+  retro: require('../../assets/sounds/open/retro.wav'),
+  elegant: require('../../assets/sounds/open/elegant.wav'),
+  christmas: require('../../assets/sounds/open/christmas.wav'),
+  halloween: require('../../assets/sounds/open/halloween.wav'),
+  valentine: require('../../assets/sounds/open/valentine.wav'),
+  festival: require('../../assets/sounds/open/festival.wav'),
+  sunset: require('../../assets/sounds/open/sunset.wav'),
+};
+
+const openPlayers = new Map<OpenFamily, AudioPlayer>();
+
+function ensureOpenPool(): void {
+  for (const id of OPEN_FAMILIES) {
+    if (openPlayers.has(id)) continue;
+    openPlayers.set(id, createAudioPlayer(openSources[id]));
+  }
+}
+
 ensurePagePool();
+ensureOpenPool();
+
+/** Opening the closed book. Not a page turn. Follows the master switch, volume, and the book-opening toggle. */
+export function playBookOpen(family: OpenFamily): boolean {
+  const prefs = useDiary.getState().settings;
+  if (!prefs.soundEnabled || !(prefs.soundVolume > 0) || prefs.bookOpenMusic === false) return false;
+  ensureOpenPool();
+  const player = openPlayers.get(family) ?? openPlayers.get('cozy');
+  if (!player) return false;
+  player.volume = Math.min(0.8, Math.max(0, prefs.soundVolume));
+  try {
+    void player.seekTo(0);
+  } catch {
+    // Start from wherever the clip is if it has not seeked yet.
+  }
+  player.play();
+  if (typeof __DEV__ !== 'undefined' && __DEV__) console.log('[book-open] play', family);
+  return true;
+}
 
 export function playPlusSound(): void {
   const prefs = useDiary.getState().settings;

@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams, type Href } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BackHandler, Image, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { BackHandler, Image, PanResponder, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BuddyView } from '@/src/buddies/BuddyView';
@@ -8,7 +8,7 @@ import { getBuddy } from '@/src/buddies/catalog';
 import { EntryExtras } from '@/src/components/EntryExtras';
 import { MoodPicker } from '@/src/components/MoodPicker';
 import { FontFields } from '@/src/components/FontFields';
-import { PageFlip } from '@/src/components/PageFlip';
+import { PageFlip, type PageFlipHandle } from '@/src/components/PageFlip';
 import { Paper } from '@/src/components/Paper';
 import { Screen } from '@/src/components/Screen';
 import { StickerLayer } from '@/src/components/StickerLayer';
@@ -22,6 +22,7 @@ import { birthdayFrom, shopToday } from '@/src/logic/seasons';
 import { addDays, formatLong, todayKey } from '@/src/logic/dates';
 import { uid } from '@/src/logic/id';
 import { writingStreak } from '@/src/logic/streak';
+import { claimHorizontalSwipe, releaseSwipe } from '@/src/logic/swipe';
 import type { DiaryEntry, StickerPlacement } from '@/src/models/types';
 import { lightTap } from '@/src/services/haptics';
 import { playPageTurn } from '@/src/services/sounds';
@@ -152,7 +153,14 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
   const [celebrate, setCelebrate] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showThemes, setShowThemes] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [scrollOn, setScrollOn] = useState(true);
   const leaving = useRef(false);
+  const flipRef = useRef<PageFlipHandle>(null);
+  const editingRef = useRef(false);
+  const widthRef = useRef(1);
+  editingRef.current = editing;
+  widthRef.current = pageSize.width || 1;
   const review = useReviewMoment();
   const prompt = promptForDate(draft.date);
   const listedPacks = PACKS.filter((pack) => packIsListed(pack, wallet.ownedPackIds, shopToday(settings.debugDate), birthdayFrom(settings.birthdayMonth, settings.birthdayDay)));
@@ -235,6 +243,31 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
     setDraft({ ...draft, date: addDays(draft.date, delta) });
   }
 
+  const stepRef = useRef(stepEntry);
+  stepRef.current = stepEntry;
+  const swipe = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gesture) => claimHorizontalSwipe(gesture.dx, gesture.dy, editingRef.current),
+        onPanResponderGrant: () => setScrollOn(false),
+        onPanResponderMove: (_, gesture) => {
+          flipRef.current?.follow(gesture.dx / Math.max(widthRef.current, 240));
+        },
+        onPanResponderRelease: (_, gesture) => {
+          setScrollOn(true);
+          const decision = releaseSwipe(gesture.dx / Math.max(widthRef.current, 240));
+          if (decision === 'cancel') flipRef.current?.cancel();
+          else flipRef.current?.finish(decision, () => stepRef.current(decision === 'next' ? 1 : -1));
+        },
+        onPanResponderTerminate: () => {
+          setScrollOn(true);
+          flipRef.current?.cancel();
+        },
+        onPanResponderTerminationRequest: () => false,
+      }),
+    [],
+  );
+
   function pageNeedsSave(latest: Draft): boolean {
   const content = latest.title.trim() || latest.body.trim() || latest.photos.length > 0 || latest.stickers.length > 0 || latest.themeOverride || latest.design || latest.fontId || latest.inkColor;
   const stored = useDiary.getState().entries.find((entry) => entry.id === latest.id);
@@ -262,9 +295,9 @@ function updateSticker(next: StickerPlacement) {
         <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>{toast || (saved ? 'On this device' : 'Not saved yet')}</Text>
         <Pressable onPress={() => setConfirmDelete(true)}><Text style={{ color: theme.colors.danger, fontFamily: theme.body }}>Delete</Text></Pressable>
       </View>
-      <ScrollView style={{ flex: 1 }} scrollEnabled contentContainerStyle={{ padding: 16, paddingBottom: decorate ? 12 : 40 }} keyboardShouldPersistTaps="handled">
-        <PageFlip flipKey={`${draft.id}:${draft.date}`}>
-        <View onLayout={(event) => setPageSize({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height })}>
+      <ScrollView style={{ flex: 1 }} scrollEnabled={scrollOn} contentContainerStyle={{ padding: 16, paddingBottom: decorate ? 12 : 40 }} keyboardShouldPersistTaps="handled">
+        <PageFlip ref={flipRef} flipKey={`${draft.id}:${draft.date}`}>
+        <View {...swipe.panHandlers} onLayout={(event) => setPageSize({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height })}>
           <Paper style={{ minHeight: 640 }}>
             <View pointerEvents={decorate ? 'none' : 'auto'} style={[padding, { zIndex: decorate ? 0 : 3 }]}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -278,6 +311,8 @@ function updateSticker(next: StickerPlacement) {
               <TextInput
                 value={draft.title}
                 onChangeText={(title) => setDraft({ ...draft, title })}
+                onFocus={() => setEditing(true)}
+                onBlur={() => setEditing(false)}
                 placeholder="Title"
                 placeholderTextColor={theme.colors.paperSoft}
                 editable={!decorate}
@@ -286,6 +321,8 @@ function updateSticker(next: StickerPlacement) {
               <TextInput
                 value={draft.body}
                 onChangeText={(body) => setDraft({ ...draft, body })}
+                onFocus={() => setEditing(true)}
+                onBlur={() => setEditing(false)}
                 placeholder="Write the page…"
                 placeholderTextColor={theme.colors.paperSoft}
                 multiline

@@ -51,7 +51,10 @@ describe('sounds', () => {
     assert.equal(claimHorizontalSwipe(10, 40, false), false);
     assert.equal(claimHorizontalSwipe(40, 4, true), false);
     assert.equal(releaseSwipe(-0.4), 'next');
-    assert.equal(releaseSwipe(0.3), 'prev');
-    assert.equal(releaseSwipe(0.1), 'cancel');
+    assert.equal(releaseSwipe(0.4), 'prev');
+    assert.equal(releaseSwipe(0.2), 'cancel');
+    assert.equal(releaseSwipe(-0.05, -1200), 'next');
+    assert.equal(releaseSwipe(0.05, 1200), 'prev');
+    assert.equal(releaseSwipe(-0.5, 1200), 'prev');
   });
 });

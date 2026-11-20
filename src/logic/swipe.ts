@@ -5,9 +5,19 @@ export function claimHorizontalSwipe(dx: number, dy: number, editing: boolean): 
   return Math.abs(dx) > Math.abs(dy) + 8;
 }
 
-/** Negative progress is a swipe toward the next page. */
-export function releaseSwipe(progress: number): 'next' | 'prev' | 'cancel' {
-  if (progress <= -0.22) return 'next';
-  if (progress >= 0.22) return 'prev';
+const COMMIT = 0.37;
+const FLING = 900;
+
+/**
+ * Negative progress is a swipe toward the next page.
+ * Past about 37% of the width commits. A fast fling commits too, and a fast
+ * fling the other way wins so a reversed drag can fall back or turn around.
+ * velocityX is pixels per second.
+ */
+export function releaseSwipe(progress: number, velocityX = 0): 'next' | 'prev' | 'cancel' {
+  if (velocityX <= -FLING) return 'next';
+  if (velocityX >= FLING) return 'prev';
+  if (progress <= -COMMIT) return 'next';
+  if (progress >= COMMIT) return 'prev';
   return 'cancel';
 }

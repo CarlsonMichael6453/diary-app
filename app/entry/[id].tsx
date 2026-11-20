@@ -28,7 +28,6 @@ import { collageSlots, type CollagePreset } from '@/src/logic/collage';
 import { PAGE_TEXT_ID, reorderStack, type LayerMove } from '@/src/logic/layers';
 import type { DiaryEntry, NotePlacement, PhotoFrame, PhotoPlacement, StickerPlacement } from '@/src/models/types';
 import { lightTap } from '@/src/services/haptics';
-import { playPageTurn } from '@/src/services/sounds';
 import { pickDiaryPhotos, takeDiaryPhoto } from '@/src/services/photos';
 import { useDiary } from '@/src/store/useDiary';
 import { PACKS, stickersInPack } from '@/src/stickers/catalog';
@@ -235,9 +234,18 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
   function goBack() {
     if (leaving.current) return;
     leaving.current = true;
-    void playPageTurn();
-    if (router.canGoBack()) router.back();
-    else router.replace('/');
+    const leave = () => {
+      if (router.canGoBack()) router.back();
+      else router.replace('/');
+    };
+    if (flipRef.current) flipRef.current.finish('prev', leave);
+    else leave();
+  }
+
+  function turnPage(delta: number) {
+    const go = () => stepEntry(delta);
+    if (flipRef.current) flipRef.current.finish(delta > 0 ? 'next' : 'prev', go);
+    else go();
   }
 
   function stepEntry(delta: number) {
@@ -266,7 +274,7 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
         },
         onPanResponderRelease: (_, gesture) => {
           setScrollOn(true);
-          const decision = releaseSwipe(gesture.dx / Math.max(widthRef.current, 240));
+          const decision = releaseSwipe(gesture.dx / Math.max(widthRef.current, 240), gesture.vx);
           if (decision === 'cancel') flipRef.current?.cancel();
           else flipRef.current?.finish(decision, () => stepRef.current(decision === 'next' ? 1 : -1));
         },
@@ -368,9 +376,9 @@ function updateSticker(next: StickerPlacement) {
           <Paper style={{ minHeight: 640 }}>
             <View pointerEvents={decorate ? 'none' : 'auto'} style={[padding, { zIndex: 80, position: 'relative', paddingBottom: 0 }]}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Pressable accessibilityLabel="Previous page" onPress={() => stepEntry(-1)}><Text style={{ color: theme.colors.paperInk, fontSize: 20 }}>‹</Text></Pressable>
+                <Pressable accessibilityLabel="Previous page" onPress={() => turnPage(-1)}><Text style={{ color: theme.colors.paperInk, fontSize: 20 }}>‹</Text></Pressable>
                 <Text style={{ color: theme.colors.paperSoft, fontFamily: theme.body }}>{formatLong(draft.date)}</Text>
-                <Pressable accessibilityLabel="Next page" onPress={() => stepEntry(1)}><Text style={{ color: theme.colors.paperInk, fontSize: 20 }}>›</Text></Pressable>
+                <Pressable accessibilityLabel="Next page" onPress={() => turnPage(1)}><Text style={{ color: theme.colors.paperInk, fontSize: 20 }}>›</Text></Pressable>
               </View>
               <Text style={{ color: theme.colors.paperInk, fontFamily: theme.script, fontSize: 22, marginTop: 8 }}>{prompt}</Text>
               <MoodPicker value={draft.mood} onChange={(mood) => setDraft({ ...draft, mood })} />

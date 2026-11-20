@@ -128,4 +128,17 @@ for (const [id, samples] of Object.entries(moods)) {
   writeWav(join(root, 'moods', `${id}.wav`), samples);
 }
 
-console.log(`wrote ${Object.keys(buddies).length} buddy sounds and ${Object.keys(moods).length} mood sounds`);
+const plus = concat([
+  tone(1046, 0.11, { amp: 0.14, attack: 0.004, release: 0.07 }),
+  tone(1318, 0.11, { amp: 0.14, release: 0.07 }),
+  tone(1568, 0.11, { amp: 0.15, release: 0.08 }),
+  tone(2093, 0.16, { amp: 0.14, partial: 0.12, release: 0.1 }),
+  silence(0.03),
+  tone(1568, 0.1, { amp: 0.1 }),
+  tone(2093, 0.1, { amp: 0.11 }),
+  tone(2637, 0.28, { amp: 0.12, partial: 0.18, release: 0.16 }),
+  tone(3136, 0.34, { amp: 0.07, attack: 0.01, release: 0.22 }),
+]);
+writeWav(join(root, 'plus', 'celebrate.wav'), plus);
+
+console.log(`wrote ${Object.keys(buddies).length} buddy sounds, ${Object.keys(moods).length} mood sounds, and the Plus chime`);

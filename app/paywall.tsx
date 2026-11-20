@@ -5,8 +5,10 @@ import { Text, View } from 'react-native';
 import { BUDDIES } from '@/src/buddies/catalog';
 import { BuddyView } from '@/src/buddies/BuddyView';
 import { Screen } from '@/src/components/Screen';
+import { SparkleBurst } from '@/src/components/SparkleBurst';
 import { Button } from '@/src/components/ui';
 import { getProduct, getPurchaseProvider } from '@/src/services/purchases';
+import { playPlusSound } from '@/src/services/sounds';
 import { useDiary } from '@/src/store/useDiary';
 import { PACKS, stickersInPack } from '@/src/stickers/catalog';
 import { StickerView } from '@/src/stickers/StickerView';
@@ -22,6 +24,7 @@ export default function PaywallScreen() {
   const purchases = useDiary((state) => state.wallet.purchases);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
+  const [celebrate, setCelebrate] = useState(false);
   const provider = getPurchaseProvider();
   const premiumPacks = PACKS.filter((pack) => pack.premium && !pack.seasonal && !pack.hidden);
   const premiumBuddies = BUDDIES.filter((buddy) => buddy.premium);
@@ -34,16 +37,24 @@ export default function PaywallScreen() {
       setNote(result.message);
       return;
     }
+    const hadPlus = useDiary.getState().wallet.premium;
     const applied = applyPurchase(productId);
     const product = getProduct(productId);
     setNote(applied.ok ? `${applied.message} Test mode — no charge.` : applied.message);
-    if (product?.kind === 'premium') setNote('Diary Plus is unlocked on this device. Test mode — no charge.');
+    if (product?.kind === 'premium' && applied.ok) {
+      setNote('Diary Plus is unlocked on this device. Test mode — no charge.');
+      if (!hadPlus) {
+        setCelebrate(true);
+        playPlusSound();
+      }
+    }
   }
 
   return (
     <Screen>
       <Button label="Close" tone="ghost" onPress={() => router.back()} />
       <View style={{ marginTop: 12, backgroundColor: theme.colors.accent, borderRadius: theme.radius, padding: 16 }}>
+        {celebrate ? <SparkleBurst /> : null}
         <Text style={{ color: theme.colors.onAccent, fontFamily: theme.body, fontSize: 12 }}>TEST MODE</Text>
         <Text style={{ color: theme.colors.onAccent, fontFamily: theme.display, fontSize: 36 }}>Diary Plus</Text>
         <Text style={{ color: theme.colors.onAccent, fontFamily: theme.body }}>
@@ -87,12 +98,22 @@ export default function PaywallScreen() {
           tone="ghost"
           onPress={async () => {
             const result = await provider.restore(purchases.map((purchase) => purchase.productId));
+            const hadPlus = premium;
             const restored = restorePremium() || result.premium;
             setNote(restored ? 'Diary Plus restored on this device.' : 'No previous test purchase was found.');
+            if (restored && !hadPlus) {
+              setCelebrate(true);
+              playPlusSound();
+            }
           }}
         />
       </View>
-      {note ? <Text style={{ color: theme.colors.ink, fontFamily: theme.body, marginTop: 12 }}>{note}</Text> : null}
+      {note ? (
+        <View style={{ marginTop: 12, minHeight: 88, position: 'relative' }}>
+          {celebrate ? <SparkleBurst /> : null}
+          <Text style={{ color: theme.colors.ink, fontFamily: theme.body }}>{note}</Text>
+        </View>
+      ) : null}
     </Screen>
   );
 }

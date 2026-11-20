@@ -28,6 +28,7 @@ import { useDiary } from '@/src/store/useDiary';
 import { PACKS, stickersInPack } from '@/src/stickers/catalog';
 import { StickerView } from '@/src/stickers/StickerView';
 import { ThemeOverride, useTheme } from '@/src/theme/BookTheme';
+import { applyDesign, type ColorDesign } from '@/src/theme/designs';
 import { THEMES, getTheme, type ThemeId } from '@/src/theme/themes';
 
 type Draft = {
@@ -39,6 +40,7 @@ type Draft = {
   photos: string[];
   stickers: StickerPlacement[];
   themeOverride: ThemeId | null;
+  design?: ColorDesign | null;
   createdAt: number;
   bookId?: string;
   tags?: string[];
@@ -64,6 +66,7 @@ function fromEntry(entry: DiaryEntry): Draft {
     photos: entry.photos,
     stickers: entry.stickers,
     themeOverride: entry.themeOverride,
+    design: entry.design,
     createdAt: entry.createdAt,
     bookId: entry.bookId,
     tags: entry.tags ?? [],
@@ -80,8 +83,18 @@ export default function EntryScreen() {
   const params = useLocalSearchParams<{ id: string; date?: string }>();
   const routeId = String(params.id ?? 'new');
   const bookThemeId = useDiary((state) => state.settings.themeId);
+  const premium = useDiary((state) => state.wallet.premium);
+  const bookDesign = useDiary((state) => state.settings.books.find((book) => book.id === state.settings.activeBookId)?.design);
+  const ticket = useDiary((state) => state.pageDesignTicket);
   const existing = useDiary((state) => state.entries.find((entry) => entry.id === routeId));
   const [draft, setDraft] = useState<Draft | null>(null);
+  const seenTicket = useRef(ticket?.token ?? 0);
+
+  useEffect(() => {
+    if (!ticket || ticket.token === seenTicket.current) return;
+    seenTicket.current = ticket.token;
+    setDraft((current) => (current ? { ...current, design: ticket.design ?? undefined } : current));
+  }, [ticket]);
 
   useEffect(() => {
     if (draft) return;
@@ -90,9 +103,9 @@ export default function EntryScreen() {
   }, [draft, existing, params.date, routeId]);
 
   if (!draft) return null;
-  const pageTheme = draft.themeOverride ? getTheme(draft.themeOverride) : null;
+  const pageTheme = applyDesign(getTheme(draft.themeOverride ?? bookThemeId), draft.design === undefined ? bookDesign : draft.design, premium);
   return (
-    <ThemeOverride theme={pageTheme ?? getTheme(bookThemeId)}>
+    <ThemeOverride theme={pageTheme}>
       <Editor draft={draft} setDraft={setDraft} />
     </ThemeOverride>
   );
@@ -345,9 +358,17 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
           <Button label="Done decorating" onPress={() => setDecorate(false)} style={{ marginTop: 8 }} />
         </View>
       ) : (
-        <View style={{ flexDirection: 'row', gap: 8, padding: 12, paddingBottom: Math.max(insets.bottom, 12) }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 12, paddingBottom: Math.max(insets.bottom, 12) }}>
           <Button label="Decorate" onPress={() => setDecorate(true)} style={{ flex: 1 }} />
           <Button label={draft.themeOverride ? `${getTheme(draft.themeOverride).name} page` : 'Page style'} tone="ghost" onPress={() => setShowThemes((value) => !value)} style={{ flex: 1 }} />
+          <Button
+            label="Colors"
+            tone="ghost"
+            onPress={() => {
+              useDiary.getState().rememberPageDesign(draft.design ?? null);
+              router.push('/color-designer?target=page' as Href);
+            }}
+          />
           <Button label="Pal" tone="ghost" onPress={() => router.push('/buddies' as Href)} />
         </View>
       )}

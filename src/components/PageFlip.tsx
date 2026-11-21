@@ -34,19 +34,18 @@ function curlGeometry(w: number, h: number, progress: number, corner: CurlCorner
   const cy = corner[0] === 'b' ? h : 0;
   const ix = corner[1] === 'r' ? -1 : 1;
   const iy = corner[0] === 't' ? 1 : -1;
-  const pullDeg = 66 * Math.pow(1 - t, 0.42) + 2;
-  const pull = (pullDeg * Math.PI) / 180;
-  const dx = ix * Math.cos(pull);
-  const dy = iy * Math.sin(pull);
-  const project = (x: number, y: number) => (x - cx) * dx + (y - cy) * dy;
-  const maxProj = Math.max(project(0, 0), project(w, 0), project(0, h), project(w, h));
-  const dist = Math.pow(t, 1.15) * (maxProj * 0.96 + 24);
-  const mx = cx + dx * dist;
-  const my = cy + dy * dist;
+  const pull = ((52 * Math.pow(1 - t, 0.7) + 4) * Math.PI) / 180;
+  const reach = Math.pow(t, 1.85) * Math.hypot(w, h) * 1.35;
+  const px = cx + ix * Math.cos(pull) * reach;
+  const py = cy + iy * Math.sin(pull) * reach;
+  const mx = (cx + px) / 2;
+  const my = (cy + py) / 2;
+  const dx = px - cx;
+  const dy = py - cy;
   const side = (x: number, y: number) => (x - mx) * dx + (y - my) * dy;
   const hits: number[][] = [];
   const add = (x: number, y: number) => {
-    if (x < -2 || x > w + 2 || y < -2 || y > h + 2) return;
+    if (x < -1.5 || x > w + 1.5 || y < -1.5 || y > h + 1.5) return;
     const point = [Math.min(w, Math.max(0, x)), Math.min(h, Math.max(0, y))];
     if (!hits.some((other) => Math.hypot(other[0] - point[0], other[1] - point[1]) < 2)) hits.push(point);
   };
@@ -65,23 +64,21 @@ function curlGeometry(w: number, h: number, progress: number, corner: CurlCorner
     return pts.slice().sort((a, b) => Math.atan2(a[1] - ay, a[0] - ax) - Math.atan2(b[1] - ay, b[0] - ax));
   };
   const corners = [[0, 0], [w, 0], [w, h], [0, h]];
-  const front = sort([...corners.filter(([x, y]) => (incoming ? side(x, y) <= 0.8 : side(x, y) >= -0.8)), ...hits]);
-  const radius = 7 + 14 * Math.sin(Math.PI * Math.pow(t, 0.8));
-  const flapDepth = Math.min(Math.max(0, dist) * 0.74, 26 + Math.min(w, h) * 0.33 * Math.sin(Math.PI * Math.min(t, 0.96)));
-  const flap = hits.length >= 2
-    ? (() => {
-        const midX = (hits[0][0] + hits[1][0]) / 2;
-        const midY = (hits[0][1] + hits[1][1]) / 2;
-        const span = Math.hypot(midX - cx, midY - cy) || 1;
-        const alongX = (midX - cx) / span;
-        const alongY = (midY - cy) / span;
-        const reach = incoming ? Math.min(flapDepth, span * 0.85) : Math.min(span * 0.78, flapDepth);
-        const apexX = incoming ? midX + alongX * reach : cx + alongX * reach;
-        const apexY = incoming ? midY + alongY * reach : cy + alongY * reach;
-        return [hits[0], hits[1], [Math.min(w, Math.max(0, apexX)), Math.min(h, Math.max(0, apexY))]];
-      })()
-    : [];
-  return { front, flap, hits, dx, dy, radius, dist };
+  const tipSign = Math.sign(side(px, py)) || 1;
+  const onTipSide = (x: number, y: number) => side(x, y) * tipSign >= -0.6;
+  const kept = incoming
+    ? corners.filter(([x, y]) => !onTipSide(x, y))
+    : corners.filter(([x, y]) => onTipSide(x, y));
+  const front = hits.length >= 2 ? sort([...kept, ...hits]) : corners;
+  const reflect = (x: number, y: number) => {
+    const span = dx * dx + dy * dy || 1;
+    const scale = side(x, y) / span;
+    return [x - 2 * scale * dx, y - 2 * scale * dy];
+  };
+  const revealed = hits.length >= 2 ? [[cx, cy], ...hits, ...corners.filter(([x, y]) => !onTipSide(x, y) && !(x === cx && y === cy))] : [];
+  const flap = revealed.length >= 3 ? sort(revealed.map(([x, y]) => reflect(x, y))) : [];
+  const radius = 5 + 7 * Math.sin(Math.PI * Math.min(t, 1));
+  return { front, flap, hits, tip: [px, py], radius, cleared: t > 0.97 || hits.length < 2 && t > 0.9 };
 }
 
 function curlPolygon(pts: number[][]) {
@@ -393,6 +390,7 @@ export const PageFlip = forwardRef<
           el.style.opacity = '0';
           el.style.visibility = 'hidden';
           el.style.transform = '';
+          el.style.filter = '';
         }
       }
     };
@@ -420,66 +418,62 @@ export const PageFlip = forwardRef<
         prev.style.visibility = incoming ? 'visible' : 'hidden';
         prev.style.opacity = incoming ? '1' : '0';
       }
-      if (page) clipOf(page, amount <= 0.015 ? '' : curlPolygon(shape.front));
-      const revealX = incoming ? shape.dx : -shape.dx;
-      const revealY = incoming ? shape.dy : -shape.dy;
-      const showFlap = flap && shape.flap.length >= 3 && amount > 0.03 && amount < 0.97;
+      const empty = 'polygon(0px 0px, 0px 0px, 0px 0px)';
+      if (page) clipOf(page, amount <= 0.02 ? '' : shape.cleared && !incoming ? empty : curlPolygon(shape.front));
+      const shade = byId('curl-shadow-shape');
+      const showFlap = Boolean(flap && shape.flap.length >= 3 && shape.hits.length >= 2 && amount > 0.025 && amount < 0.97);
       if (showFlap && flap) {
         const clip = curlPolygon(shape.flap);
         flap.style.visibility = 'visible';
         flap.style.opacity = '1';
-        flap.style.backgroundColor = '#e4c7a6';
-        flap.style.backgroundImage = 'linear-gradient(155deg, rgba(255,246,232,0.55), rgba(166,112,68,0.38))';
+        flap.style.backgroundColor = '#e7c9a8';
+        flap.style.backgroundImage = 'linear-gradient(168deg, #f6e2c8, #d9b48e)';
         clipOf(flap, clip);
-      } else if (flap) {
-        flap.style.opacity = '0';
-        flap.style.visibility = 'hidden';
-      }
-      if (shadow) {
-        if (showFlap) {
-          clipOf(shadow, curlPolygon(shape.flap));
-          shadow.style.backgroundColor = 'rgba(42,26,18,0.28)';
-          shadow.style.backgroundImage = 'none';
-          shadow.style.filter = 'blur(8px)';
+        if (shadow && shade) {
+          clipOf(shade, clip);
+          shade.style.backgroundColor = 'rgba(48,30,22,0.45)';
+          const [tipX, tipY] = shape.tip;
+          const midX = (shape.hits[0][0] + shape.hits[1][0]) / 2;
+          const midY = (shape.hits[0][1] + shape.hits[1][1]) / 2;
+          const len = Math.hypot(tipX - midX, tipY - midY) || 1;
           shadow.style.visibility = 'visible';
           shadow.style.opacity = '1';
-          shadow.style.transform = `translate(${revealX * 18}px, ${revealY * 18}px)`;
-        } else {
-          shadow.style.opacity = '0';
+          shadow.style.filter = 'blur(14px)';
+          shadow.style.transform = `translate(${((tipX - midX) / len) * 7}px, ${((tipY - midY) / len) * 5 + 7}px)`;
         }
+      } else {
+        if (flap) {
+          flap.style.opacity = '0';
+          flap.style.visibility = 'hidden';
+        }
+        if (shadow) shadow.style.opacity = '0';
       }
-      if (shape.hits.length < 2 || amount <= 0.03 || amount >= 0.97) {
-        for (const el of [crease, roll]) {
-          if (el) el.style.opacity = '0';
-        }
+      if (!showFlap || shape.hits.length < 2) {
+        if (roll) roll.style.opacity = '0';
+        if (crease) crease.style.opacity = '0';
         return;
       }
       const [a, b] = shape.hits;
       const fx = b[0] - a[0];
       const fy = b[1] - a[1];
       const length = Math.max(8, Math.hypot(fx, fy));
-      let ang = (Math.atan2(fy, fx) * 180) / Math.PI;
-      if (fy * revealX - fx * revealY < 0) ang += 180;
+      const [tipX, tipY] = shape.tip;
       const midX = (a[0] + b[0]) / 2;
       const midY = (a[1] + b[1]) / 2;
-      const place = (el: HTMLElement | null, cssH: number, shift: number, scaleY: number) => {
-        if (!el) return;
-        el.style.visibility = 'visible';
-        el.style.opacity = '1';
-        el.style.width = `${length}px`;
-        el.style.transformOrigin = 'center center';
-        const destX = midX + revealX * shift;
-        const destY = midY + revealY * shift;
-        el.style.transform = `translate(${destX - length / 2}px, ${destY - cssH / 2}px) rotate(${ang}deg) scaleY(${scaleY})`;
-      };
+      let ang = (Math.atan2(fy, fx) * 180) / Math.PI;
+      const toTipX = tipX - midX;
+      const toTipY = tipY - midY;
+      if (fy * toTipX - fx * toTipY < 0) ang += 180;
       if (roll) {
-        roll.style.backgroundImage = 'linear-gradient(to bottom, rgba(60,40,30,0.05) 0%, rgba(255,252,246,0.15) 16%, #fffaf2 38%, #f3ddc4 52%, #c48962 68%, #6a4030 86%, #3a241c 100%)';
+        roll.style.visibility = 'visible';
+        roll.style.opacity = '1';
+        roll.style.width = `${length}px`;
+        roll.style.transformOrigin = 'center center';
+        roll.style.backgroundImage = 'linear-gradient(to bottom, rgba(70,46,32,0.22) 0%, #fffaf2 30%, #f4d7b6 58%, rgba(231,201,168,0) 100%)';
+        const thick = Math.max(8, shape.radius * 2);
+        roll.style.transform = `translate(${midX - length / 2}px, ${midY - 18}px) rotate(${ang}deg) scaleY(${thick / 36})`;
       }
-      place(roll, 36, shape.radius * 0.15, Math.max(0.4, (shape.radius * 2) / 36));
-      if (crease) {
-        crease.style.backgroundImage = 'linear-gradient(to bottom, rgba(42,26,20,0), rgba(42,26,20,0.24))';
-      }
-      place(crease, 16, -(shape.radius * 0.45 + 3), 1);
+      if (crease) crease.style.opacity = '0';
     };
     let curlFrame = 0;
     const runCurl = (direction: 'next' | 'prev', top: boolean, onDone: () => void) => {
@@ -610,7 +604,9 @@ export const PageFlip = forwardRef<
         <View pointerEvents="none" style={StyleSheet.absoluteFill}>{nextSheet}</View>
         {Platform.OS === 'web' ? (
           <>
-            <View nativeID="curl-shadow" pointerEvents="none" style={styles.shadow} />
+            <View nativeID="curl-shadow" pointerEvents="none" style={styles.shadow}>
+              <View nativeID="curl-shadow-shape" pointerEvents="none" style={styles.shadowShape} />
+            </View>
             <View nativeID="curl-leaf" style={styles.leaf}>{children}</View>
             <View nativeID="curl-crease" pointerEvents="none" style={styles.crease} />
             <View nativeID="curl-prev" pointerEvents="none" style={styles.cover}>{prevSheet}</View>
@@ -639,6 +635,7 @@ const styles = StyleSheet.create({
   leaf: { flexGrow: 1, zIndex: 2, backgroundColor: 'transparent' },
   cover: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 4, opacity: 0 },
   shadow: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 3, opacity: 0 },
+  shadowShape: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
   crease: { position: 'absolute', left: 0, top: 0, width: 8, height: 16, zIndex: 3, opacity: 0 },
   flap: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 5, opacity: 0 },
   roll: { position: 'absolute', left: 0, top: 0, width: 8, height: 36, zIndex: 6, opacity: 0 },

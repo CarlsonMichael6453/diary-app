@@ -27,6 +27,14 @@ function consumeHandoff() {
 }
 
 type CurlCorner = 'tr' | 'br' | 'tl' | 'bl';
+type TurnZone = 'top' | 'middle' | 'bottom';
+
+function turnZone(localY: number, pageHeight: number): TurnZone {
+  const span = pageHeight || 1;
+  if (localY < span / 3) return 'top';
+  if (localY > (span * 2) / 3) return 'bottom';
+  return 'middle';
+}
 
 function curlGeometry(w: number, h: number, progress: number, corner: CurlCorner, incoming: boolean) {
   const t = Math.max(0, Math.min(1, progress));
@@ -125,8 +133,8 @@ export const PageFlip = forwardRef<
   reduceRef.current = reduce;
   const paperRef = useRef(theme.colors.paper);
   paperRef.current = theme.colors.paper;
-  const playRef = useRef<(direction: 'next' | 'prev', top: boolean) => void>(() => {});
-  const curlRef = useRef<(direction: 'next' | 'prev', top: boolean, onDone: () => void) => void>(() => {});
+  const playRef = useRef<(direction: 'next' | 'prev', zone: TurnZone) => void>(() => {});
+  const curlRef = useRef<(direction: 'next' | 'prev', zone: TurnZone, onDone: () => void) => void>(() => {});
   const stopCurlRef = useRef<() => void>(() => {});
 
   useEffect(() => {
@@ -151,15 +159,15 @@ export const PageFlip = forwardRef<
     commitRef.current?.(direction);
   }
 
-  function playTurnFromJS(direction: 'next' | 'prev', top: boolean) {
+  function playTurnFromJS(direction: 'next' | 'prev', zone: TurnZone) {
     if (Platform.OS === 'web') {
-      playRef.current(direction, top);
+      playRef.current(direction, zone);
       return;
     }
     const blocked = direction === 'next' ? canNextSV.value < 1 : canPrevSV.value < 1;
     if (blocked || drawingLock.value > 0) return;
     side.value = direction === 'next' ? -1 : 1;
-    fingerY.value = top ? 1 : 0;
+    fingerY.value = zone === 'top' ? 1 : zone === 'bottom' ? 0 : 0.5;
     fingerX.value = direction === 'next' ? 0 : 1;
     markHandoff();
     const go = () => {
@@ -205,7 +213,7 @@ export const PageFlip = forwardRef<
       markHandoff();
       const go = () => landed(done);
       if (Platform.OS === 'web') {
-        curlRef.current(direction, true, go);
+        curlRef.current(direction, 'top', go);
         return;
       }
       side.value = direction === 'next' ? -1 : 1;
@@ -250,7 +258,8 @@ export const PageFlip = forwardRef<
           const reveal = Math.abs(event.translationX) / w;
           const blocked = direction === 'next' ? canNextSV.value < 1 : canPrevSV.value < 1;
           if (releaseCurl(direction, reveal, event.velocityX, blocked) !== 'commit') return;
-          runOnJS(playTurnFromJS)(direction, event.y < h / 2);
+          const zone: TurnZone = event.y < h / 3 ? 'top' : event.y > (h * 2) / 3 ? 'bottom' : 'middle';
+          runOnJS(playTurnFromJS)(direction, zone);
         }),
     [armed, canNextSV, canPrevSV, editingSV, fingerX, fingerY, height, originX, originY, reduceSV, side, width],
   );
@@ -265,10 +274,11 @@ export const PageFlip = forwardRef<
     const h = height.value || 1;
     if (reduceSV.value || side.value !== -1) return { opacity: 1, transform: [], willChange: 'transform' } as object;
     const progress = fingerX.value;
-    const top = fingerY.value > 0.5;
+    const mid = fingerY.value > 0.2 && fingerY.value < 0.8;
+    const top = !mid && fingerY.value > 0.5;
     const angleY = -progress * 150;
-    const angleZ = (top ? -1 : 1) * progress * 18;
-    const originY = top ? -h / 2 : h / 2;
+    const angleZ = mid ? 0 : (top ? -1 : 1) * progress * 18;
+    const originY = mid ? 0 : top ? -h / 2 : h / 2;
     return {
       opacity: 1,
       transform: [
@@ -289,10 +299,11 @@ export const PageFlip = forwardRef<
     const h = height.value || 1;
     if (side.value !== 1) return { opacity: 0, transform: [{ translateX: -8 }], willChange: 'transform' } as object;
     const progress = fingerX.value;
-    const top = fingerY.value > 0.5;
+    const mid = fingerY.value > 0.2 && fingerY.value < 0.8;
+    const top = !mid && fingerY.value > 0.5;
     const angleY = progress * 150;
-    const angleZ = (top ? 1 : -1) * progress * 18;
-    const originY = top ? -h / 2 : h / 2;
+    const angleZ = mid ? 0 : (top ? 1 : -1) * progress * 18;
+    const originY = mid ? 0 : top ? -h / 2 : h / 2;
     return {
       opacity: 1,
       transform: [
@@ -391,15 +402,81 @@ export const PageFlip = forwardRef<
           el.style.visibility = 'hidden';
           el.style.transform = '';
           el.style.filter = '';
+          el.style.backgroundImage = '';
+          el.style.height = '';
+          el.style.width = '';
         }
       }
     };
-    const paintCurl = (direction: 'next' | 'prev', top: boolean, amount: number) => {
+    const paintCurl = (direction: 'next' | 'prev', zone: TurnZone, amount: number) => {
       const root = pageNode() as HTMLElement | null;
       if (!root) return;
       const w = root.clientWidth || 1;
       const h = root.clientHeight || 1;
       const incoming = direction === 'prev';
+      const clipOf = (el: HTMLElement, value: string) => {
+        el.style.clipPath = value;
+        el.style.setProperty('-webkit-clip-path', value);
+      };
+      if (zone === 'middle') {
+        const crease = incoming ? w * amount : w * (1 - amount);
+        const bend = 18 + 16 * Math.sin(Math.PI * Math.min(Math.max(amount, 0), 1));
+        const band = (x0: number, x1: number) => {
+          const left = Math.max(0, Math.min(w, Math.min(x0, x1)));
+          const right = Math.max(0, Math.min(w, Math.max(x0, x1)));
+          if (right - left < 0.5) return 'polygon(0px 0px, 0px 0px, 0px 0px)';
+          return `polygon(${left.toFixed(1)}px 0px, ${right.toFixed(1)}px 0px, ${right.toFixed(1)}px ${h.toFixed(1)}px, ${left.toFixed(1)}px ${h.toFixed(1)}px)`;
+        };
+        const leaf = byId('curl-leaf');
+        const prev = byId('curl-prev');
+        const flap = byId('curl-flap');
+        const shadow = byId('curl-shadow');
+        const shade = byId('curl-shadow-shape');
+        const roll = byId('curl-roll');
+        const page = incoming ? prev : leaf;
+        if (leaf && incoming) clipOf(leaf, '');
+        if (prev) {
+          prev.style.visibility = incoming ? 'visible' : 'hidden';
+          prev.style.opacity = incoming ? '1' : '0';
+        }
+        if (page) clipOf(page, amount <= 0.02 ? '' : amount >= 0.98 && !incoming ? 'polygon(0px 0px, 0px 0px, 0px 0px)' : band(0, crease));
+        const show = amount > 0.03 && amount < 0.97;
+        if (flap && show) {
+          clipOf(flap, band(incoming ? crease : crease - bend, incoming ? crease + bend : crease));
+          flap.style.visibility = 'visible';
+          flap.style.opacity = '1';
+          flap.style.backgroundColor = '#e7c9a8';
+          flap.style.backgroundImage = incoming ? 'linear-gradient(to right, #f6e2c8, #d9b48e)' : 'linear-gradient(to left, #f6e2c8, #d9b48e)';
+        } else if (flap) {
+          flap.style.opacity = '0';
+        }
+        if (shadow && shade && show) {
+          const shadowAt = incoming ? crease + bend : crease;
+          clipOf(shade, band(shadowAt, shadowAt + 52));
+          shade.style.backgroundColor = 'transparent';
+          shade.style.backgroundImage = 'linear-gradient(to right, rgba(40,24,18,0.34), rgba(40,24,18,0))';
+          shadow.style.visibility = 'visible';
+          shadow.style.opacity = '1';
+          shadow.style.filter = 'blur(12px)';
+          shadow.style.transform = 'none';
+        } else if (shadow) shadow.style.opacity = '0';
+        if (roll && show) {
+          const thick = 16;
+          roll.style.visibility = 'visible';
+          roll.style.opacity = '1';
+          roll.style.width = `${thick}px`;
+          roll.style.height = `${h}px`;
+          roll.style.transformOrigin = 'center center';
+          roll.style.backgroundImage = incoming
+            ? 'linear-gradient(to right, rgba(70,46,32,0.2) 0%, #fffaf2 36%, #f3d7b4 72%, rgba(231,201,168,0) 100%)'
+            : 'linear-gradient(to left, rgba(70,46,32,0.2) 0%, #fffaf2 36%, #f3d7b4 72%, rgba(231,201,168,0) 100%)';
+          roll.style.transform = `translate(${crease - thick / 2}px, 0px)`;
+        } else if (roll) roll.style.opacity = '0';
+        const creaseEl = byId('curl-crease');
+        if (creaseEl) creaseEl.style.opacity = '0';
+        return;
+      }
+      const top = zone === 'top';
       const corner: CurlCorner = direction === 'next' ? (top ? 'tr' : 'br') : top ? 'tl' : 'bl';
       const shape = curlGeometry(w, h, amount, corner, incoming);
       const leaf = byId('curl-leaf');
@@ -409,10 +486,6 @@ export const PageFlip = forwardRef<
       const crease = byId('curl-crease');
       const roll = byId('curl-roll');
       const page = incoming ? prev : leaf;
-      const clipOf = (el: HTMLElement, value: string) => {
-        el.style.clipPath = value;
-        el.style.setProperty('-webkit-clip-path', value);
-      };
       if (leaf && incoming) clipOf(leaf, '');
       if (prev) {
         prev.style.visibility = incoming ? 'visible' : 'hidden';
@@ -476,7 +549,7 @@ export const PageFlip = forwardRef<
       if (crease) crease.style.opacity = '0';
     };
     let curlFrame = 0;
-    const runCurl = (direction: 'next' | 'prev', top: boolean, onDone: () => void) => {
+    const runCurl = (direction: 'next' | 'prev', zone: TurnZone, onDone: () => void) => {
       if (settling || drawingLock.value > 0) return;
       const blocked = direction === 'next' ? !edgeRef.current.canNext : !edgeRef.current.canPrev;
       if (blocked) return;
@@ -507,16 +580,16 @@ export const PageFlip = forwardRef<
       }
       const start = performance.now();
       const tick = (now: number) => {
-        const t = Math.min(1, (now - start) / 560);
+        const t = Math.min(1, (now - start) / (zone === 'middle' ? 540 : 560));
         const eased = 1 - (1 - t) ** 3;
-        paintCurl(direction, top, eased);
+        paintCurl(direction, zone, eased);
         if (t < 1) curlFrame = requestAnimationFrame(tick);
         else complete();
       };
       curlFrame = requestAnimationFrame(tick);
-      timer = window.setTimeout(complete, 780);
+      timer = window.setTimeout(complete, zone === 'middle' ? 760 : 780);
     };
-    const play = (direction: 'next' | 'prev', top: boolean) => runCurl(direction, top, () => commitSwipe(direction));
+    const play = (direction: 'next' | 'prev', zone: TurnZone) => runCurl(direction, zone, () => commitSwipe(direction));
     playRef.current = play;
     curlRef.current = runCurl;
     const up = (event: PointerEvent) => {
@@ -531,10 +604,10 @@ export const PageFlip = forwardRef<
         const interactive = target?.closest?.('button, a, input, textarea, [data-no-page-turn], [data-decoration]');
         const tap = Math.abs(event.clientX - current.x) < 14 && Math.abs(event.clientY - current.y) < 14;
         if (tap && current.field) current.field.focus();
-        const topTap = event.clientY - current.top < (height.value || 1) / 2;
+        const zone = turnZone(event.clientY - current.top, height.value || 1);
         if (!interactive && tap) {
-          if (localX > w * 0.82 && edgeRef.current.canNext) play( 'next', topTap);
-          else if (localX < w * 0.18 && edgeRef.current.canPrev) play('prev', topTap);
+          if (localX > w * 0.82 && edgeRef.current.canNext) play('next', zone);
+          else if (localX < w * 0.18 && edgeRef.current.canPrev) play('prev', zone);
         }
         return;
       }
@@ -547,7 +620,7 @@ export const PageFlip = forwardRef<
       const direction = net <= 0 ? 'next' : 'prev';
       const reveal = Math.abs(net) / w;
       const blocked = direction === 'next' ? !edgeRef.current.canNext : !edgeRef.current.canPrev;
-      if (releaseCurl(direction, reveal, velocity, blocked) === 'commit') play(direction, current.y - current.top < (height.value || 1) / 2);
+      if (releaseCurl(direction, reveal, velocity, blocked) === 'commit') play(direction, turnZone(current.y - current.top, height.value || 1));
     };
     const fromTouch = (event: TouchEvent) => {
       const touch = event.changedTouches[0];

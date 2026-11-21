@@ -479,6 +479,7 @@ function updateSticker(next: StickerPlacement) {
               textZ={draft.textZ}
               onSelect={setSelectedId}
               onChange={updateSticker}
+              onDeselect={() => setSelectedId(null)}
             />
             <PhotoNoteLayer
               photos={draft.photoPlacements}

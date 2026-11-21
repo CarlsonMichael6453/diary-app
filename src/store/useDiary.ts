@@ -120,6 +120,7 @@ export function defaultSettings(): Settings {
     fontId: null,
     inkColor: null,
     deepWriting: false,
+    savedTags: [],
   };
 }
 

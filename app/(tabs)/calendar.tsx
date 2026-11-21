@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { Screen } from '@/src/components/Screen';
+import { VoiceMark } from '@/src/components/VoiceChip';
 import { Button } from '@/src/components/ui';
 import { getMood } from '@/src/data/moods';
 import { formatPretty, monthLabel, todayKey } from '@/src/logic/dates';
@@ -100,7 +101,7 @@ export default function CalendarScreen() {
           ) : (
             selectedEntries.map((entry) => (
               <Pressable key={entry.id} onPress={() => router.push(`/entry/${entry.id}` as Href)}>
-                <Text style={{ color: theme.colors.ink, fontFamily: theme.script, fontSize: 22 }}>{getMood(entry.mood).emoji} {entry.title || 'Untitled page'}</Text>
+                <Text style={{ color: theme.colors.ink, fontFamily: theme.script, fontSize: 22 }}>{getMood(entry.mood).emoji} {entry.title || 'Untitled page'}{entry.voiceNote ? ' ' : ''}{entry.voiceNote ? <VoiceMark /> : null}</Text>
                 <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }} numberOfLines={2}>{entry.body}</Text>
               </Pressable>
             ))

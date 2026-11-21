@@ -117,6 +117,8 @@ export type Settings = {
   seasonAnnounced: string[];
   fontId: string | null;
   inkColor: string | null;
+  /** Hide the buttons and the pal so a page is only for writing. */
+  deepWriting: boolean;
 };
 
 export type Wallet = {

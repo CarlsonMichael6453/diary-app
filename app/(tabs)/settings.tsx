@@ -63,6 +63,16 @@ export default function SettingsScreen() {
         A rating and a note. Your diary entries are never included.
       </Text>
 
+      <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 26 }}>Deep writing mode</Text>
+      <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, marginBottom: 8 }}>
+        Hides the buttons, toolbars, and pal so a page is only for writing. Typing and page turns stay available.
+      </Text>
+      <Button
+        label={settings.deepWriting ? 'Deep writing is on' : 'Deep writing is off'}
+        tone={settings.deepWriting ? 'primary' : 'ghost'}
+        onPress={() => patchSettings({ deepWriting: !settings.deepWriting })}
+      />
+
       <FieldLabel>Book title</FieldLabel>
       <TextInput value={settings.bookTitle} onChangeText={(bookTitle) => patchSettings({ bookTitle })} style={input(theme)} />
       <FieldLabel>Your name</FieldLabel>

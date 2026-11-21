@@ -401,7 +401,7 @@ function updateSticker(next: StickerPlacement) {
 
   return (
     <Screen nav={false} scroll={false} padded={false} style={{ flex: 1, paddingTop: insets.top }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingBottom: 8 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingBottom: 8, zIndex: 200 }}>
         <Pressable onPress={goBack} accessibilityLabel="Back"><Text style={{ color: theme.colors.ink, fontFamily: theme.body, fontSize: 16 }}>‹ Back</Text></Pressable>
         <Pressable onPress={() => router.navigate('/')} accessibilityLabel="Home"><Text style={{ color: theme.colors.ink, fontFamily: theme.body, fontSize: 16 }}>Home</Text></Pressable>
         <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>{toast || (saved ? 'On this device' : 'Not saved yet')}</Text>
@@ -499,7 +499,7 @@ function updateSticker(next: StickerPlacement) {
               <View
                 pointerEvents="box-none"
                 style={[
-                  { zIndex: 90 },
+                  { zIndex: 180 },
                   perch === 'tr'
                     ? { position: 'absolute', top: 0, right: 4 }
                     : perch === 'tl'
@@ -574,7 +574,7 @@ function updateSticker(next: StickerPlacement) {
       </ScrollView>
 
       {decorate ? (
-        <View style={{ maxHeight: '28%', backgroundColor: theme.colors.card, borderTopWidth: 1, borderTopColor: theme.colors.paperEdge, paddingHorizontal: 10, paddingTop: 6, paddingBottom: Math.max(insets.bottom, 8) }}>
+        <View style={{ maxHeight: '28%', backgroundColor: theme.colors.card, borderTopWidth: 1, borderTopColor: theme.colors.paperEdge, paddingHorizontal: 10, paddingTop: 6, paddingBottom: Math.max(insets.bottom, 8), zIndex: 200 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, fontSize: 12 }}>Drag a sticker. Empty page scrolls. Two fingers scroll too.</Text>
             <Button label="Done" onPress={() => setDecorate(false)} />
@@ -714,7 +714,7 @@ function updateSticker(next: StickerPlacement) {
           </HorizontalStrip>
         </View>
       ) : drawingMode ? (
-        <View style={{ backgroundColor: theme.colors.card, borderTopWidth: 1, borderTopColor: theme.colors.paperEdge, paddingHorizontal: 12, paddingTop: 8, paddingBottom: Math.max(insets.bottom, 8) }}>
+        <View style={{ backgroundColor: theme.colors.card, borderTopWidth: 1, borderTopColor: theme.colors.paperEdge, paddingHorizontal: 12, paddingTop: 8, paddingBottom: Math.max(insets.bottom, 8), zIndex: 200 }}>
           <DrawingToolbar
             color={penColor}
             size={penSize}
@@ -729,7 +729,7 @@ function updateSticker(next: StickerPlacement) {
           />
         </View>
       ) : (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 12, paddingBottom: Math.max(insets.bottom, 12) }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 12, paddingBottom: Math.max(insets.bottom, 12), zIndex: 200 }}>
           <Button label="Decorate" onPress={() => setDecorate(true)} style={{ flex: 1 }} />
           <Button label={draft.themeOverride || draft.design ? 'Page theme · custom' : 'Page theme'} tone={showThemes ? 'primary' : 'ghost'} onPress={() => setShowThemes((value) => !value)} style={{ flex: 1 }} />
           <Button label="Pal" tone="ghost" onPress={() => router.push('/buddies' as Href)} />

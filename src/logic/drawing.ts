@@ -26,6 +26,11 @@ export function pageStrokes(strokes: Stroke[]): Stroke[] {
   return strokes.filter((stroke) => stroke.space === 'page');
 }
 
+/** An eraser stroke is a hole in the ink. It is never painted as a color. */
+export function strokeRole(color: string): 'ink' | 'erase' {
+  return color === 'eraser' ? 'erase' : 'ink';
+}
+
 /** A little pencil. The lead tip sits at (3, 29), which is the cursor hotspot. */
 export function pencilSvg(color: string): string {
   const fill = isHexColor(color) ? color : '#3A2A32';

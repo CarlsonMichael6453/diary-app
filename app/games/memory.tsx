@@ -8,6 +8,7 @@ import { Screen } from '@/src/components/Screen';
 import { Button } from '@/src/components/ui';
 import { todayKey } from '@/src/logic/dates';
 import { rewardPoolFor } from '@/src/logic/packs';
+import { countReviewEntries } from '@/src/logic/review';
 import { resolveReward, rewardForMemory, type ResolvedReward } from '@/src/logic/rewards';
 import { birthdayFrom } from '@/src/logic/seasons';
 import { useDiary } from '@/src/store/useDiary';
@@ -64,7 +65,7 @@ export default function MemoryScreen() {
     const resolved = resolveReward(rewardDraft, pool, current.ownedStickerIds, current.ownedOutfitIds);
     grantReward(resolved, allowDrop ? 'memory' : undefined);
     setReward(resolved);
-    void review.consider('game-won');
+    void review.consider('game-won', undefined, countReviewEntries(useDiary.getState().entries));
   }
 
   const status = useMemo(() => `${moves} moves`, [moves]);

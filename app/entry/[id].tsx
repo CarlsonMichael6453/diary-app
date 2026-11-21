@@ -5,12 +5,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BuddyView } from '@/src/buddies/BuddyView';
 import { getBuddy } from '@/src/buddies/catalog';
+import { DrawingSurface, DrawingToolbar, LegacyDrawing } from '@/src/components/DrawingPad';
 import { EntryExtras } from '@/src/components/EntryExtras';
 import { HorizontalStrip } from '@/src/components/HorizontalStrip';
 import { MoodPicker } from '@/src/components/MoodPicker';
 import { FontFields } from '@/src/components/FontFields';
 import { PhotoNoteLayer } from '@/src/components/PhotoNoteLayer';
-import { EndPaper, NeighborPage } from '@/src/components/NeighborPage';
+import { BlankSheet, EndPaper, NeighborPage } from '@/src/components/NeighborPage';
 import { PageFlip, type PageFlipHandle } from '@/src/components/PageFlip';
 import { Paper } from '@/src/components/Paper';
 import { Screen } from '@/src/components/Screen';
@@ -22,12 +23,13 @@ import { promptForDate } from '@/src/data/prompts';
 import { canUseItem } from '@/src/logic/access';
 import { packIsListed } from '@/src/logic/packs';
 import { birthdayFrom, shopToday } from '@/src/logic/seasons';
-import { pageNeighbors } from '@/src/logic/bookPages';
+import { pageNeighbors, type PageStop } from '@/src/logic/bookPages';
 import { formatLong, todayKey } from '@/src/logic/dates';
 import { uid } from '@/src/logic/id';
 import { countReviewEntries } from '@/src/logic/review';
 import { writingStreak } from '@/src/logic/streak';
 import { collageSlots, type CollagePreset } from '@/src/logic/collage';
+import { holdDrawing } from '@/src/logic/pageGesture';
 import { PAGE_TEXT_ID, reorderStack, type LayerMove } from '@/src/logic/layers';
 import type { DiaryEntry, NotePlacement, PhotoFrame, PhotoPlacement, StickerPlacement } from '@/src/models/types';
 import { lightTap } from '@/src/services/haptics';
@@ -112,13 +114,15 @@ export default function EntryScreen() {
   const existing = useDiary((state) => state.entries.find((entry) => entry.id === routeId));
   const [draft, setDraft] = useState<Draft | null>(null);
   const seenTicket = useRef(0);
-  const routeSeen = useRef(routeId);
+  const dateParam = typeof params.date === 'string' ? params.date : '';
+  const routeSeen = useRef(`${routeId}:${dateParam}`);
 
   useEffect(() => {
-    if (routeSeen.current === routeId) return;
-    routeSeen.current = routeId;
+    const key = `${routeId}:${dateParam}`;
+    if (routeSeen.current === key) return;
+    routeSeen.current = key;
     setDraft(null);
-  }, [routeId]);
+  }, [routeId, dateParam]);
 
   useEffect(() => {
     if (!ticket || !draft || ticket.entryId !== draft.id || ticket.token === seenTicket.current) return;
@@ -170,7 +174,30 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
   const [showThemes, setShowThemes] = useState(false);
   const [editing, setEditing] = useState(false);
   const [scrollOn, setScrollOn] = useState(true);
+  const [drawingMode, setDrawingMode] = useState(false);
+  const [drawScroll, setDrawScroll] = useState(false);
+  const [penColor, setPenColor] = useState('#3A2A32');
+  const [penSize, setPenSize] = useState(5);
+  const [erasing, setErasing] = useState(false);
+  const [recentColors, setRecentColors] = useState<string[]>([]);
   const leaving = useRef(false);
+
+  useEffect(() => {
+    holdDrawing(drawingMode);
+    return () => holdDrawing(false);
+  }, [drawingMode]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const onScroll = (event: Event) => setDrawScroll(Boolean((event as CustomEvent<boolean>).detail));
+    window.addEventListener('diary-draw-scroll', onScroll);
+    return () => window.removeEventListener('diary-draw-scroll', onScroll);
+  }, []);
+
+  function rememberColor(next: string) {
+    setPenColor(next);
+    setRecentColors((colors) => [next, ...colors.filter((color) => color !== next)].slice(0, 6));
+  }
   const scrollRef = useRef<{ getScrollableNode?: () => { style: CSSStyleDeclaration }; style?: CSSStyleDeclaration } | null>(null);
   const screen = useWindowDimensions();
   const pageMin = Math.max(640, screen.height - insets.top - 132);
@@ -248,6 +275,7 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
   }
 
   function turnPage(delta: number) {
+    if (drawingMode) return;
     const go = () => stepEntry(delta);
     if (flipRef.current) flipRef.current.finish(delta > 0 ? 'next' : 'prev', go);
     else go();
@@ -258,20 +286,35 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
     return entries.filter((entry) => (entry.bookId ?? 'daily') === bookId);
   }
 
+  function sheetFor(stop: PageStop | null, edge: 'start' | 'end') {
+    if (!stop) return <EndPaper edge={edge} />;
+    if (stop.kind === 'blank') return <BlankSheet date={stop.date} />;
+    const entry = entries.find((item) => item.id === stop.id);
+    if (!entry) return <EndPaper edge={edge} />;
+    const book = settings.books.find((item) => item.id === (entry.bookId ?? settings.activeBookId));
+    return <NeighborPage entry={entry} book={book} premium={wallet.premium} />;
+  }
+
+  function openStop(stop: PageStop | null) {
+    if (!stop) return;
+    if (stop.kind === 'entry') router.replace(`/entry/${stop.id}` as Href);
+    else router.replace(`/entry/new?date=${stop.date}` as Href);
+  }
+
   function stepEntry(delta: number) {
-    const { prev, next } = pageNeighbors(pagesInBook(), draft);
-    const neighbor = delta > 0 ? next : prev;
-    if (neighbor) router.replace(`/entry/${neighbor.id}` as Href);
+    if (drawingMode) return;
+    const { prev, next } = pageNeighbors(pagesInBook(), draft, todayKey());
+    openStop(delta > 0 ? next : prev);
   }
 
   const neighbors = useMemo(() => {
     const bookId = draft.bookId ?? settings.activeBookId;
     const pages = entries.filter((entry) => (entry.bookId ?? 'daily') === bookId);
-    return pageNeighbors(pages, draft);
+    return pageNeighbors(pages, draft, todayKey());
   }, [draft, entries, settings.activeBookId]);
 
   function pageNeedsSave(latest: Draft): boolean {
-  const content = latest.title.trim() || latest.body.trim() || latest.photos.length > 0 || latest.stickers.length > 0 || latest.photoPlacements.length > 0 || latest.notes.length > 0 || latest.photoOnly || latest.themeOverride || latest.design || latest.fontId || latest.inkColor;
+  const content = latest.title.trim() || latest.body.trim() || latest.photos.length > 0 || latest.stickers.length > 0 || latest.photoPlacements.length > 0 || latest.notes.length > 0 || latest.photoOnly || latest.drawing || latest.voiceNote || latest.themeOverride || latest.design || latest.fontId || latest.inkColor;
   const stored = useDiary.getState().entries.find((entry) => entry.id === latest.id);
   const lookChanged = Boolean(stored) && ((stored?.themeOverride ?? null) !== (latest.themeOverride ?? null) || JSON.stringify(stored?.design ?? null) !== JSON.stringify(latest.design ?? null) || (stored?.fontId ?? null) !== (latest.fontId ?? null) || (stored?.inkColor ?? null) !== (latest.inkColor ?? null));
   return Boolean(content || lookChanged);
@@ -356,7 +399,7 @@ function updateSticker(next: StickerPlacement) {
       <ScrollView
         ref={scrollRef as never}
         style={[{ flex: 1 }, webScroll]}
-        scrollEnabled={scrollOn}
+        scrollEnabled={scrollOn && (!drawingMode || drawScroll)}
         contentContainerStyle={{ flexGrow: 1, padding: 16, paddingBottom: decorate ? 12 : 40 }}
         keyboardShouldPersistTaps="handled"
       >
@@ -374,8 +417,8 @@ function updateSticker(next: StickerPlacement) {
           }}
           style={{ flexGrow: 1, minHeight: pageMin }}
           onCommit={(direction) => stepEntry(direction === 'next' ? 1 : -1)}
-          nextSheet={neighbors.next ? <NeighborPage entry={neighbors.next} book={settings.books.find((book) => book.id === (neighbors.next?.bookId ?? settings.activeBookId))} premium={wallet.premium} /> : <EndPaper edge="end" />}
-          prevSheet={neighbors.prev ? <NeighborPage entry={neighbors.prev} book={settings.books.find((book) => book.id === (neighbors.prev?.bookId ?? settings.activeBookId))} premium={wallet.premium} /> : <EndPaper edge="start" />}
+          nextSheet={sheetFor(neighbors.next, 'end')}
+          prevSheet={sheetFor(neighbors.prev, 'start')}
         >
         <View onLayout={(event) => setPageSize({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height })}>
           <Paper style={{ flexGrow: 1, minHeight: pageMin }}>
@@ -387,7 +430,8 @@ function updateSticker(next: StickerPlacement) {
               </View>
               <Text style={{ color: theme.colors.paperInk, fontFamily: theme.script, fontSize: 22, marginTop: 8 }}>{prompt}</Text>
               <MoodPicker value={draft.mood} onChange={(mood) => setDraft({ ...draft, mood })} />
-              <EntryExtras isNew={!saved} draft={draft} onChange={(patch) => setDraft({ ...draft, ...patch })} />
+              <EntryExtras isNew={!saved} draft={draft} onChange={(patch) => setDraft({ ...draft, ...patch })} onDraw={() => { setDrawingMode(true); setDrawScroll(false); }} />
+              <LegacyDrawing value={draft.drawing} paper={theme.colors.paper} />
               {draft.photoOnly ? <Text style={{ color: theme.colors.paperSoft, fontFamily: theme.body, marginTop: 12 }}>Photo page</Text> : null}
             </View>
             {draft.photoOnly ? null : (
@@ -471,6 +515,15 @@ function updateSticker(next: StickerPlacement) {
                 />
               </View>
             ) : null}
+            <DrawingSurface
+              value={draft.drawing}
+              active={drawingMode && !drawScroll}
+              color={penColor}
+              size={penSize}
+              erase={erasing}
+              paper={theme.colors.paper}
+              onChange={(drawing) => setDraft({ ...draft, drawing })}
+            />
           </Paper>
         </View>
         </PageFlip>
@@ -640,6 +693,21 @@ function updateSticker(next: StickerPlacement) {
               );
             })}
           </HorizontalStrip>
+        </View>
+      ) : drawingMode ? (
+        <View style={{ backgroundColor: theme.colors.card, borderTopWidth: 1, borderTopColor: theme.colors.paperEdge, paddingHorizontal: 12, paddingTop: 8, paddingBottom: Math.max(insets.bottom, 8) }}>
+          <DrawingToolbar
+            color={penColor}
+            size={penSize}
+            erase={erasing}
+            recent={recentColors}
+            scrolling={drawScroll}
+            onColor={rememberColor}
+            onSize={setPenSize}
+            onErase={setErasing}
+            onScroll={setDrawScroll}
+            onDone={() => { setDrawingMode(false); setDrawScroll(false); }}
+          />
         </View>
       ) : (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 12, paddingBottom: Math.max(insets.bottom, 12) }}>

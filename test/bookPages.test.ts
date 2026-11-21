@@ -9,15 +9,33 @@ const written = [
 ];
 
 describe('page neighbors', () => {
-  it('turns a saved page onto the pages beside it, including the ends', () => {
-    assert.deepEqual(pageNeighbors(written, written[0]), { prev: null, next: written[1] });
-    assert.deepEqual(pageNeighbors(written, written[1]), { prev: written[0], next: null });
+  it('steps from a written page onto the blank day between entries', () => {
+    const { prev, next } = pageNeighbors(written, written[0], '2026-11-18');
+    assert.equal(prev, null);
+    assert.deepEqual(next, { kind: 'blank', date: '2026-11-16' });
   });
 
-  it('places an unsaved blank page in the date order', () => {
-    const blank = { id: 'new', date: '2026-11-21', createdAt: 3 };
-    const between = { id: 'gap', date: '2026-11-16', createdAt: 4 };
-    assert.deepEqual(pageNeighbors(written, blank), { prev: written[1], next: null });
-    assert.deepEqual(pageNeighbors(written, between), { prev: written[0], next: written[1] });
+  it('opens a fresh blank page after the last written page', () => {
+    const { prev, next } = pageNeighbors(written, written[1], '2026-11-18');
+    assert.equal(prev?.kind, 'blank');
+    assert.equal(prev?.kind === 'blank' && prev.date, '2026-11-17');
+    assert.deepEqual(next, { kind: 'blank', date: '2026-11-19' });
+  });
+
+  it('walks blank to blank and back to a written page', () => {
+    const gap = { id: 'gap', date: '2026-11-16', createdAt: 9 };
+    const forward = pageNeighbors(written, gap, '2026-11-18');
+    assert.equal(forward.prev?.kind, 'entry');
+    assert.equal(forward.prev?.kind === 'entry' && forward.prev.id, 'older');
+    assert.deepEqual(forward.next, { kind: 'blank', date: '2026-11-17' });
+    const second = pageNeighbors(written, { id: 'gap2', date: '2026-11-17', createdAt: 10 }, '2026-11-18');
+    assert.equal(second.next?.kind, 'entry');
+    assert.equal(second.next?.kind === 'entry' && second.next.id, 'newer');
+  });
+
+  it('keeps a blank day after today so the last page can still turn forward', () => {
+    const today = { id: 'today', date: '2026-11-21', createdAt: 3 };
+    const { next } = pageNeighbors(written, today, '2026-11-21');
+    assert.deepEqual(next, { kind: 'blank', date: '2026-11-22' });
   });
 });

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { Image, Text, View } from 'react-native';
 
 import type { DiaryBook, DiaryEntry } from '../models/types';
@@ -10,7 +10,7 @@ import { applyType, fontById } from '../theme/fonts';
 import { Paper } from './Paper';
 
 /** A non-interactive copy of a real page, prerendered under the curl. */
-export function NeighborPage({ entry, book, premium }: { entry: DiaryEntry; book?: DiaryBook; premium: boolean }) {
+export const NeighborPage = memo(function NeighborPage({ entry, book, premium }: { entry: DiaryEntry; book?: DiaryBook; premium: boolean }) {
   const look = applyType(resolveEntryLook(book ?? { themeId: 'cutesy' }, entry, premium), entry.fontId ?? book?.fontId, entry.inkColor ?? book?.inkColor);
   const mood = getMood(entry.mood);
   const [box, setBox] = useState({ w: 0, h: 0 });
@@ -47,6 +47,18 @@ export function NeighborPage({ entry, book, premium }: { entry: DiaryEntry; book
         </View>
       </Paper>
     </ThemeOverride>
+  );
+});
+
+export function BlankSheet({ date }: { date: string }) {
+  const theme = useTheme();
+  return (
+    <Paper style={{ minHeight: 640 }}>
+      <View style={{ minHeight: 640, padding: 28 }}>
+        <Text style={{ color: theme.colors.paperSoft, fontFamily: theme.body }}>{date}</Text>
+        <Text style={{ color: theme.colors.paperInk, fontFamily: theme.script, fontSize: 28, marginTop: 16 }}>A blank page</Text>
+      </View>
+    </Paper>
   );
 }
 

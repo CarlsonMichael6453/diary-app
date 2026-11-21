@@ -13,3 +13,10 @@ export const stripTouch = makeMutable(0);
 export function holdStrip(held: boolean) {
   stripTouch.value = held ? 1 : 0;
 }
+
+/** Set for the whole drawing session so a thumb swipe cannot turn the page. */
+export const drawingLock = makeMutable(0);
+
+export function holdDrawing(held: boolean) {
+  drawingLock.value = held ? 1 : 0;
+}

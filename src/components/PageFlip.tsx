@@ -5,7 +5,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 
 import { curlLayout, foldAngle } from '../logic/curl';
-import { decorationDrag, stripTouch } from '../logic/pageGesture';
+import { decorationDrag, drawingLock, stripTouch } from '../logic/pageGesture';
 import { claimHorizontalSwipe, releaseCurl, verticalScrollWins } from '../logic/swipe';
 import { playCurlCommit } from '../services/sounds';
 import { useTheme } from '../theme/BookTheme';
@@ -101,7 +101,7 @@ export const PageFlip = forwardRef<
       if (commit) commitSwipe(direction);
     };
     nativeFinish.current = finish;
-    setTimeout(finish, commit ? 460 : 340);
+    setTimeout(finish, commit ? 780 : 560);
   }
   function finishNativeTurn() {
     nativeFinish.current?.();
@@ -171,7 +171,7 @@ export const PageFlip = forwardRef<
         .failOffsetY([-18, 18])
         .onTouchesMove((event, manager) => {
           'worklet';
-          if (decorationDrag.value > 0 || stripTouch.value > 0 || editingSV.value > 0 || event.numberOfTouches > 1) manager.fail();
+          if (decorationDrag.value > 0 || stripTouch.value > 0 || drawingLock.value > 0 || editingSV.value > 0 || event.numberOfTouches > 1) manager.fail();
         })
         .onTouchesUp(() => {
           'worklet';
@@ -209,7 +209,7 @@ export const PageFlip = forwardRef<
           const target = decision === 'commit' ? (direction === 'next' ? 0 : w) : direction === 'next' ? w : 0;
           if (decision === 'commit') markHandoff();
           runOnJS(armNativeTurn)(decision === 'commit', direction);
-          fingerX.value = withTiming(target, { duration: reduceSV.value ? 120 : 220, easing: Easing.out(Easing.cubic) }, (finished) => {
+          fingerX.value = withSpring(target, { velocity: event.velocityX, damping: 22, stiffness: 190, mass: 0.7, overshootClamping: true }, (finished) => {
             if (finished) runOnJS(finishNativeTurn)();
           });
         }),
@@ -235,7 +235,8 @@ export const PageFlip = forwardRef<
     return {
       width: w,
       clipPath: `polygon(0px 0px, ${x0}px 0px, ${x1}px ${h}px, 0px ${h}px)`,
-    };
+      willChange: 'clip-path, transform',
+    } as object;
   });
 
   const prevStyle = useAnimatedStyle(() => {
@@ -251,7 +252,8 @@ export const PageFlip = forwardRef<
       opacity: 1,
       width: w,
       clipPath: `polygon(0px 0px, ${x0}px 0px, ${x1}px ${h}px, 0px ${h}px)`,
-    };
+      willChange: 'clip-path, transform',
+    } as object;
   });
 
   const foldStyle = useAnimatedStyle(() => {
@@ -262,14 +264,15 @@ export const PageFlip = forwardRef<
     if (reduceSV.value || layout.side === 'flat') return { opacity: 0, width: 0 };
     return {
       opacity: 1,
-      left: layout.foldX - 8,
       width: 16,
       transform: [
+        { translateX: layout.foldX - 8 },
         { translateY: fingerY.value - h / 2 },
         { rotate: `${layout.angle}deg` },
         { translateY: -(fingerY.value - h / 2) },
       ],
-    };
+      willChange: 'transform',
+    } as object;
   });
 
   const shadowStyle = useAnimatedStyle(() => {
@@ -280,14 +283,15 @@ export const PageFlip = forwardRef<
     if (reduceSV.value || layout.side === 'flat') return { opacity: 0, width: 0 };
     return {
       opacity: 0.9,
-      left: layout.foldX + 6,
       width: 28,
       transform: [
+        { translateX: layout.foldX + 6 },
         { translateY: fingerY.value - h / 2 },
         { rotate: `${layout.angle}deg` },
         { translateY: -(fingerY.value - h / 2) },
       ],
-    };
+      willChange: 'transform',
+    } as object;
   });
 
   const boxRef = useRef<any>(null);
@@ -313,7 +317,7 @@ export const PageFlip = forwardRef<
     };
     const begin = (clientX: number, clientY: number, timeStamp: number, targetNode: EventTarget | null, prevent: () => void) => {
       if (drag && Math.abs(drag.x - clientX) < 8 && Math.abs(drag.y - clientY) < 8 && timeStamp - drag.startT < 40) return;
-      if (settling || editingRef.current || decorationDrag.value > 0 || stripTouch.value > 0) return;
+      if (settling || editingRef.current || decorationDrag.value > 0 || stripTouch.value > 0 || drawingLock.value > 0) return;
       const target = (targetNode instanceof Element ? targetNode : (targetNode as Node | null)?.parentElement) as HTMLElement | null;
       if (target?.closest?.('[data-no-page-turn], [data-decoration]')) return;
       const active = document.activeElement as HTMLElement | null;
@@ -367,7 +371,7 @@ export const PageFlip = forwardRef<
       if (!drag || event.pointerType === 'touch') return;
       follow(event.clientX, event.clientY, event.timeStamp);
     };
-    const settle = (commit: boolean, direction: 'next' | 'prev') => {
+    const settle = (commit: boolean, direction: 'next' | 'prev', releaseVelocity = 0) => {
       if (settling) return;
       settling = true;
       const w = width.value || 1;
@@ -382,10 +386,10 @@ export const PageFlip = forwardRef<
         if (commit) commitSwipe(direction);
       };
       if (commit) markHandoff();
-      fingerX.value = withTiming(target, { duration: commit ? 240 : 180, easing: Easing.out(Easing.cubic) }, () => {
+      fingerX.value = withSpring(target, { velocity: releaseVelocity, damping: commit ? 22 : 26, stiffness: commit ? 180 : 240, mass: 0.75, overshootClamping: true }, () => {
         runOnJS(complete)();
       });
-      window.setTimeout(complete, commit ? 420 : 320);
+      window.setTimeout(complete, commit ? 720 : 520);
     };
     const up = (event: PointerEvent) => {
       const current = drag;
@@ -415,7 +419,7 @@ export const PageFlip = forwardRef<
       const reveal = Math.abs(net) / w;
       const blocked = direction === 'next' ? !edgeRef.current.canNext : !edgeRef.current.canPrev;
       side.value = direction === 'next' ? -1 : 1;
-      settle(releaseCurl(direction, reveal, velocity, blocked) === 'commit', direction);
+      settle(releaseCurl(direction, reveal, velocity, blocked) === 'commit', direction, velocity);
     };
     const fromTouch = (event: TouchEvent) => {
       const touch = event.changedTouches[0];

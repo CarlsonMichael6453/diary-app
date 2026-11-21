@@ -5,8 +5,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BuddyView } from '@/src/buddies/BuddyView';
 import { getBuddy } from '@/src/buddies/catalog';
-import { DrawingSurface, DrawingToolbar, LegacyDrawing } from '@/src/components/DrawingPad';
-import { EntryExtras } from '@/src/components/EntryExtras';
+import { DrawingSurface, DrawingToolbar, LegacyDrawing, PencilIcon } from '@/src/components/DrawingPad';
+import { EntryExtras, TagMenu } from '@/src/components/EntryExtras';
+import { DeviceLock, IconButton, PalIcon, StyleIcon } from '@/src/components/IconButton';
+import { VoiceNote } from '@/src/components/VoiceNote';
 import { HorizontalStrip } from '@/src/components/HorizontalStrip';
 import { MoodPicker } from '@/src/components/MoodPicker';
 import { FontFields } from '@/src/components/FontFields';
@@ -174,7 +176,7 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
   const [toast, setToast] = useState('');
   const [celebrate, setCelebrate] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [showThemes, setShowThemes] = useState(false);
+  const [styleTab, setStyleTab] = useState<'decorate' | 'theme' | 'palette' | null>(null);
   const [editing, setEditing] = useState(false);
   const [scrollOn, setScrollOn] = useState(true);
   const [drawingMode, setDrawingMode] = useState(false);
@@ -195,7 +197,7 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
       setDrawingMode(false);
       setDrawScroll(false);
       setDecorate(false);
-      setShowThemes(false);
+      setStyleTab(null);
     }
     patchSettings({ deepWriting: next });
   }
@@ -419,12 +421,13 @@ function updateSticker(next: StickerPlacement) {
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <Pressable onPress={goBack} accessibilityLabel="Back"><Text style={{ color: theme.colors.ink, fontFamily: theme.body, fontSize: 16 }}>‹ Back</Text></Pressable>
             <Pressable onPress={() => router.navigate('/')} accessibilityLabel="Home"><Text style={{ color: theme.colors.ink, fontFamily: theme.body, fontSize: 16 }}>Home</Text></Pressable>
-            <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>{toast || (saved ? 'On this device' : 'Not saved yet')}</Text>
+            <DeviceLock saved={saved} />
             <Pressable onPress={() => setConfirmDelete(true)}><Text style={{ color: theme.colors.danger, fontFamily: theme.body }}>Delete</Text></Pressable>
           </View>
         </FadeChrome>
         <DeepWritingButton on={deep} onPress={() => setDeep(!deep)} />
       </View>
+      {toast ? <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, fontSize: 12, textAlign: 'center', marginBottom: 4 }}>{toast}</Text> : null}
       <ScrollView
         ref={scrollRef as never}
         style={[{ flex: 1 }, webScroll]}
@@ -459,8 +462,11 @@ function updateSticker(next: StickerPlacement) {
               </View>
               <Text style={{ color: theme.colors.paperInk, fontFamily: theme.script, fontSize: 22, marginTop: 8 }}>{prompt}</Text>
               <FadeChrome hidden={deep}>
-                <MoodPicker value={draft.mood} onChange={(mood) => setDraft({ ...draft, mood })} />
-                <EntryExtras isNew={!saved} draft={draft} onChange={(patch) => setDraft({ ...draft, ...patch })} onDraw={() => { setDrawingMode(true); setDrawScroll(false); }} />
+                <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start', marginTop: 8 }}>
+                  <MoodPicker value={draft.mood} onChange={(mood) => setDraft({ ...draft, mood })} />
+                  <TagMenu tags={draft.tags} activities={draft.activities} onChange={(patch) => setDraft({ ...draft, ...patch })} />
+                </View>
+                <EntryExtras isNew={!saved} draft={draft} onChange={(patch) => setDraft({ ...draft, ...patch })} />
               </FadeChrome>
               <LegacyDrawing value={draft.drawing} paper={theme.colors.paper} />
               {draft.photoOnly ? <Text style={{ color: theme.colors.paperSoft, fontFamily: theme.body, marginTop: 12 }}>Photo page</Text> : null}
@@ -559,49 +565,81 @@ function updateSticker(next: StickerPlacement) {
           </Paper>
         </View>
         </PageFlip>
-        {showThemes ? (
-          <FadeChrome hidden={deep}>
-          <View style={{ paddingVertical: 8, gap: 8 }}>
-            <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 22 }}>Page theme</Text>
-            <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>
-              {draft.themeOverride || draft.design ? 'This page keeps its own look. Other pages still follow the book.' : 'This page uses the book design. A choice here stays on this page only.'}
-            </Text>
-            <Button label="Use book design" tone={draft.themeOverride || draft.design || draft.fontId || draft.inkColor ? 'primary' : 'ghost'} onPress={() => setDraft({ ...draft, themeOverride: null, design: undefined, fontId: undefined, inkColor: undefined })} />
-            <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 22 }}>Page font</Text>
-            <FontFields
-              fontId={draft.fontId ?? null}
-              inkColor={draft.inkColor ?? null}
-              onFont={(fontId) => setDraft({ ...draft, fontId })}
-              onInk={(inkColor) => setDraft({ ...draft, inkColor: sanitizeInk(inkColor) })}
-              onReset={() => setDraft({ ...draft, fontId: undefined, inkColor: undefined })}
-            />
-            <Button
-              label={draft.design ? 'This page has its own colors' : 'Custom colors for this page'}
-              tone="ghost"
-              onPress={() => {
-                useDiary.getState().rememberPageDesign(draft.design ?? null);
-                router.push(`/color-designer?target=page&entry=${draft.id}` as Href);
-              }}
-            />
-            <HorizontalStrip contentContainerStyle={{ gap: 8 }}>
-              {THEMES.map((item) => (
-                <Pressable key={item.id} onPress={() => { if (item.premium && !wallet.premium) { router.push('/paywall' as Href); return; } setDraft({ ...draft, themeOverride: item.id }); }} style={{ padding: 10, borderRadius: 12, backgroundColor: item.colors.paper, borderWidth: draft.themeOverride === item.id ? 2 : 0, borderColor: item.colors.accent, opacity: item.premium && !wallet.premium ? 0.55 : 1 }}>
-                  <Text style={{ color: item.colors.paperInk, fontFamily: item.body }}>{item.emoji} {item.name}{item.premium ? ' · Plus' : ''}</Text>
-                </Pressable>
-              ))}
-            </HorizontalStrip>
-          </View>
-          </FadeChrome>
-        ) : null}
       </ScrollView>
 
       <FadeChrome hidden={deep}>
-      {decorate ? (
-        <View style={{ maxHeight: '28%', backgroundColor: theme.colors.card, borderTopWidth: 1, borderTopColor: theme.colors.paperEdge, paddingHorizontal: 10, paddingTop: 6, paddingBottom: Math.max(insets.bottom, 8), zIndex: 200 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, fontSize: 12 }}>Drag a sticker. Empty page scrolls. Two fingers scroll too.</Text>
-            <Button label="Done" onPress={() => setDecorate(false)} />
+      {styleTab ? (
+        <View style={{ maxHeight: 340, overflow: 'hidden', backgroundColor: theme.colors.card, borderTopWidth: 1, borderTopColor: theme.colors.paperEdge, paddingHorizontal: 10, paddingTop: 6, paddingBottom: Math.max(insets.bottom, 8), zIndex: 200 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+            <View style={{ flexDirection: 'row', gap: 6, flex: 1 }}>
+              {([
+                ['decorate', 'Decorate'],
+                ['theme', 'Theme'],
+                ['palette', 'Palette'],
+              ] as const).map(([id, label]) => (
+                <Pressable
+                  key={id}
+                  accessibilityLabel={label}
+                  onPress={() => {
+                    setStyleTab(id);
+                    setDecorate(id === 'decorate');
+                  }}
+                  style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: styleTab === id ? theme.colors.accent : theme.colors.chip }}
+                >
+                  <Text style={{ color: styleTab === id ? theme.colors.onAccent : theme.colors.chipInk, fontFamily: theme.body, fontSize: 13 }}>{label}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Button label="Done" onPress={() => { setStyleTab(null); setDecorate(false); }} />
           </View>
+          <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ paddingBottom: 8 }}>
+          {styleTab === 'decorate' ? (
+            <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, fontSize: 12, marginBottom: 4 }}>Drag a sticker. Empty page scrolls. Two fingers scroll too.</Text>
+          ) : null}
+          {styleTab === 'theme' ? (
+            <View style={{ gap: 8, paddingTop: 8 }}>
+              <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>
+                {draft.themeOverride || draft.design ? 'This page keeps its own look. Other pages still follow the book.' : 'This page uses the book design. A choice here stays on this page only.'}
+              </Text>
+              <Button label="Use book design" tone={draft.themeOverride || draft.design || draft.fontId || draft.inkColor ? 'primary' : 'ghost'} onPress={() => setDraft({ ...draft, themeOverride: null, design: undefined, fontId: undefined, inkColor: undefined })} />
+              <FontFields
+                section="type"
+                fontId={draft.fontId ?? null}
+                inkColor={draft.inkColor ?? null}
+                onFont={(fontId) => setDraft({ ...draft, fontId })}
+                onInk={(inkColor) => setDraft({ ...draft, inkColor: sanitizeInk(inkColor) })}
+                onReset={() => setDraft({ ...draft, fontId: undefined, inkColor: undefined })}
+              />
+              <HorizontalStrip contentContainerStyle={{ gap: 8 }}>
+                {THEMES.map((item) => (
+                  <Pressable key={item.id} onPress={() => { if (item.premium && !wallet.premium) { router.push('/paywall' as Href); return; } setDraft({ ...draft, themeOverride: item.id }); }} style={{ padding: 10, borderRadius: 12, backgroundColor: item.colors.paper, borderWidth: draft.themeOverride === item.id ? 2 : 0, borderColor: item.colors.accent, opacity: item.premium && !wallet.premium ? 0.55 : 1 }}>
+                    <Text style={{ color: item.colors.paperInk, fontFamily: item.body }}>{item.emoji} {item.name}{item.premium ? ' · Plus' : ''}</Text>
+                  </Pressable>
+                ))}
+              </HorizontalStrip>
+            </View>
+          ) : null}
+          {styleTab === 'palette' ? (
+            <View style={{ gap: 8, paddingTop: 8 }}>
+              <FontFields
+                section="ink"
+                fontId={draft.fontId ?? null}
+                inkColor={draft.inkColor ?? null}
+                onFont={(fontId) => setDraft({ ...draft, fontId })}
+                onInk={(inkColor) => setDraft({ ...draft, inkColor: sanitizeInk(inkColor) })}
+              />
+              <Button
+                label={draft.design ? 'This page has its own colors' : 'Custom colors for this page'}
+                tone="ghost"
+                onPress={() => {
+                  useDiary.getState().rememberPageDesign(draft.design ?? null);
+                  router.push(`/color-designer?target=page&entry=${draft.id}` as Href);
+                }}
+              />
+            </View>
+          ) : null}
+          {styleTab === 'decorate' ? (
+            <View>
           {selectedLayer ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
               <Button label="Front" tone="ghost" onPress={() => moveLayer(selectedLayer, 'front')} />
@@ -735,6 +773,9 @@ function updateSticker(next: StickerPlacement) {
               );
             })}
           </HorizontalStrip>
+            </View>
+          ) : null}
+          </ScrollView>
         </View>
       ) : drawingMode ? (
         <View style={{ backgroundColor: theme.colors.card, borderTopWidth: 1, borderTopColor: theme.colors.paperEdge, paddingHorizontal: 12, paddingTop: 8, paddingBottom: Math.max(insets.bottom, 8), zIndex: 200 }}>
@@ -752,10 +793,17 @@ function updateSticker(next: StickerPlacement) {
           />
         </View>
       ) : (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 12, paddingBottom: Math.max(insets.bottom, 12), zIndex: 200 }}>
-          <Button label="Decorate" onPress={() => setDecorate(true)} style={{ flex: 1 }} />
-          <Button label={draft.themeOverride || draft.design ? 'Page theme · custom' : 'Page theme'} tone={showThemes ? 'primary' : 'ghost'} onPress={() => setShowThemes((value) => !value)} style={{ flex: 1 }} />
-          <Button label="Pal" tone="ghost" onPress={() => router.push('/buddies' as Href)} />
+        <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 12, paddingTop: 8, paddingBottom: Math.max(insets.bottom, 12), zIndex: 200 }}>
+          <VoiceNote compact value={draft.voiceNote} onChange={(voiceNote) => setDraft({ ...draft, voiceNote })} />
+          <IconButton label="Draw on this page" onPress={() => { setDrawingMode(true); setDrawScroll(false); }}>
+            <PencilIcon color={theme.colors.ink} size={26} />
+          </IconButton>
+          <IconButton label="Style" onPress={() => { setStyleTab('decorate'); setDecorate(true); }}>
+            <StyleIcon color={theme.colors.ink} />
+          </IconButton>
+          <IconButton label="Pal" onPress={() => router.push('/buddies' as Href)}>
+            <PalIcon color={theme.colors.ink} />
+          </IconButton>
         </View>
       )}
       </FadeChrome>

@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 
+import { IconButton, MicIcon } from './IconButton';
 import { Button } from './ui';
 
-export function VoiceNote({ value, onChange }: { value: string | null | undefined; onChange: (next: string | null) => void }) {
+export function VoiceNote({ value, onChange, compact = false }: { value: string | null | undefined; onChange: (next: string | null) => void; compact?: boolean }) {
   const [recording, setRecording] = useState(false);
   const [error, setError] = useState('');
   const recorder = useRef<MediaRecorder | null>(null);
@@ -38,9 +39,21 @@ export function VoiceNote({ value, onChange }: { value: string | null | undefine
     setRecording(false);
   }
 
+  const label = recording ? 'Stop voice note' : value ? 'Replace voice note' : 'Record a voice note';
+  if (compact) {
+    return (
+      <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end' }}>
+        <IconButton label={label} onPress={recording ? stop : start}>
+          <MicIcon color={recording ? '#8C2F39' : '#3A2A32'} />
+        </IconButton>
+        {value ? <IconButton label="Remove voice note" onPress={() => onChange(null)}><Text style={{ fontSize: 16 }}>×</Text></IconButton> : null}
+        {error ? <Text>{error}</Text> : null}
+      </View>
+    );
+  }
   return (
     <View style={{ gap: 8 }}>
-      <Button label={recording ? 'Stop voice note' : 'Record a voice note'} onPress={recording ? stop : start} />
+      <Button label={label} onPress={recording ? stop : start} />
       {value ? <Button label="Remove voice note" tone="ghost" onPress={() => onChange(null)} /> : null}
       {error ? <Text>{error}</Text> : null}
     </View>

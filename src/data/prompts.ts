@@ -103,3 +103,20 @@ export function promptForDate(dateKey: string): string {
   const index = Math.abs(dayOfYear(dateKey)) % PROMPTS.length;
   return PROMPTS[index];
 }
+
+/** A different prompt. Never returns the one on the page now. */
+export function nextPrompt(current: string, random: () => number = Math.random): string {
+  const others = PROMPTS.filter((prompt) => prompt !== current);
+  if (others.length === 0) return current;
+  const index = Math.min(others.length - 1, Math.max(0, Math.floor(random() * others.length)));
+  return others[index];
+}
+
+/** The question on a page, or nothing when prompts are off or this page hid it. */
+export function visiblePrompt(
+  page: { date: string; prompt?: string | null; promptHidden?: boolean },
+  promptsOn: boolean,
+): string | null {
+  if (!promptsOn || page.promptHidden) return null;
+  return page.prompt || promptForDate(page.date);
+}

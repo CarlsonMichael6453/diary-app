@@ -8,7 +8,7 @@ import { getBuddy } from '@/src/buddies/catalog';
 import { DrawingSurface, DrawingToolbar, LegacyDrawing, PencilIcon } from '@/src/components/DrawingPad';
 import { VoicePlayer } from '@/src/components/VoicePlayer';
 import { EntryExtras, TagMenu } from '@/src/components/EntryExtras';
-import { DeviceLock, IconButton, PalIcon, StyleIcon } from '@/src/components/IconButton';
+import { CloseIcon, DeviceLock, IconButton, PalIcon, PromptIcon, ShuffleIcon, StyleIcon } from '@/src/components/IconButton';
 import { VoiceNote } from '@/src/components/VoiceNote';
 import { HorizontalStrip } from '@/src/components/HorizontalStrip';
 import { MoodPicker } from '@/src/components/MoodPicker';
@@ -23,7 +23,7 @@ import { ReviewPrompt, useReviewMoment } from '@/src/components/ReviewPrompt';
 import { DeepWritingButton, FadeChrome } from '@/src/components/FadeChrome';
 import { Button, Confirm } from '@/src/components/ui';
 import { type MoodId } from '@/src/data/moods';
-import { promptForDate } from '@/src/data/prompts';
+import { nextPrompt, promptForDate, visiblePrompt } from '@/src/data/prompts';
 import { canUseItem } from '@/src/logic/access';
 import { packIsListed } from '@/src/logic/packs';
 import { birthdayFrom, shopToday } from '@/src/logic/seasons';
@@ -73,6 +73,8 @@ type Draft = {
   drawing?: string | null;
   placeLabel?: string | null;
   weather?: string | null;
+  prompt?: string | null;
+  promptHidden?: boolean;
 };
 
 function blank(date: string, bookId: string): Draft {
@@ -103,6 +105,8 @@ function fromEntry(entry: DiaryEntry): Draft {
     templateId: entry.templateId,
     voiceNote: entry.voiceNote,
     drawing: entry.drawing,
+    prompt: entry.prompt,
+    promptHidden: entry.promptHidden,
     placeLabel: entry.placeLabel,
     weather: entry.weather,
   };
@@ -230,7 +234,8 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
   const pageMin = Math.max(640, screen.height - insets.top - 132);
   const flipRef = useRef<PageFlipHandle>(null);
   const review = useReviewMoment();
-  const prompt = promptForDate(draft.date);
+  const promptsOn = settings.writingPrompts !== false;
+  const prompt = visiblePrompt(draft, promptsOn);
   const listedPacks = PACKS.filter((pack) => packIsListed(pack, wallet.ownedPackIds, shopToday(settings.debugDate), birthdayFrom(settings.birthdayMonth, settings.birthdayDay)));
   const activePack = listedPacks.find((pack) => pack.id === packId) ?? listedPacks[0] ?? PACKS[0];
   const streak = writingStreak(entries.map((entry) => entry.date));
@@ -341,7 +346,7 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
   }, [draft, entries, settings.activeBookId]);
 
   function pageNeedsSave(latest: Draft): boolean {
-  const content = latest.title.trim() || latest.body.trim() || latest.photos.length > 0 || latest.stickers.length > 0 || latest.photoPlacements.length > 0 || latest.notes.length > 0 || latest.photoOnly || latest.drawing || latest.voiceNote || latest.themeOverride || latest.design || latest.fontId || latest.inkColor;
+  const content = latest.title.trim() || latest.body.trim() || latest.photos.length > 0 || latest.stickers.length > 0 || latest.photoPlacements.length > 0 || latest.notes.length > 0 || latest.photoOnly || latest.drawing || latest.voiceNote || latest.themeOverride || latest.design || latest.fontId || latest.inkColor || latest.prompt || latest.promptHidden;
   const stored = useDiary.getState().entries.find((entry) => entry.id === latest.id);
   const lookChanged = Boolean(stored) && ((stored?.themeOverride ?? null) !== (latest.themeOverride ?? null) || JSON.stringify(stored?.design ?? null) !== JSON.stringify(latest.design ?? null) || (stored?.fontId ?? null) !== (latest.fontId ?? null) || (stored?.inkColor ?? null) !== (latest.inkColor ?? null));
   return Boolean(content || lookChanged);
@@ -461,7 +466,29 @@ function updateSticker(next: StickerPlacement) {
                 <Text style={{ color: theme.colors.paperSoft, fontFamily: theme.body }}>{formatLong(draft.date)}</Text>
                 <Pressable accessibilityLabel="Next page" onPress={() => turnPage(1)}><Text style={{ color: theme.colors.paperInk, fontSize: 20 }}>›</Text></Pressable>
               </View>
-              <Text style={{ color: theme.colors.paperInk, fontFamily: theme.script, fontSize: 22, marginTop: 8 }}>{prompt}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start' }} {...({ dataSet: { noPageTurn: '1' } } as object)}>
+                {prompt ? <Text style={{ flex: 1, color: theme.colors.paperInk, fontFamily: theme.script, fontSize: 22, marginTop: 8 }}>{prompt}</Text> : <View style={{ flex: 1 }} />}
+                <FadeChrome hidden={deep}>
+                  {promptsOn ? (
+                    <View style={{ flexDirection: 'row', gap: 4, marginTop: 8 }}>
+                      {prompt ? (
+                        <>
+                          <IconButton small label="Shuffle prompt" onPressIn={() => holdPage(true)} onPressOut={() => holdPage(false)} onPress={() => setDraft({ ...draft, prompt: nextPrompt(prompt), promptHidden: false })}>
+                            <ShuffleIcon color={theme.colors.paperInk} />
+                          </IconButton>
+                          <IconButton small label="Hide prompt" onPressIn={() => holdPage(true)} onPressOut={() => holdPage(false)} onPress={() => setDraft({ ...draft, promptHidden: true })}>
+                            <CloseIcon color={theme.colors.paperInk} />
+                          </IconButton>
+                        </>
+                      ) : (
+                        <IconButton small label="Show prompt" onPressIn={() => holdPage(true)} onPressOut={() => holdPage(false)} onPress={() => setDraft({ ...draft, promptHidden: false })} style={{ opacity: 0.45 }}>
+                          <PromptIcon color={theme.colors.paperInk} />
+                        </IconButton>
+                      )}
+                    </View>
+                  ) : null}
+                </FadeChrome>
+              </View>
               <FadeChrome hidden={deep}>
                 <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start', marginTop: 8 }}>
                   <MoodPicker value={draft.mood} onChange={(mood) => setDraft({ ...draft, mood })} />
@@ -546,7 +573,7 @@ function updateSticker(next: StickerPlacement) {
                   writing={draft.body.trim().length > 0 || draft.title.trim().length > 0}
                   finished={draft.body.trim().length > 40 || celebrate}
                   entryCount={entries.length}
-                  prompt={prompt}
+                  prompt={prompt ?? undefined}
                   celebrate={celebrate}
                   showLine
                   size={118}

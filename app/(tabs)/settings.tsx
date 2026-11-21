@@ -73,6 +73,16 @@ export default function SettingsScreen() {
         onPress={() => patchSettings({ deepWriting: !settings.deepWriting })}
       />
 
+      <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 26, marginTop: 18 }}>Writing prompts</Text>
+      <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, marginBottom: 8 }}>
+        Show a question at the top of each page to help you start writing.
+      </Text>
+      <Button
+        label={settings.writingPrompts !== false ? 'Writing prompts are on' : 'Writing prompts are off'}
+        tone={settings.writingPrompts !== false ? 'primary' : 'ghost'}
+        onPress={() => patchSettings({ writingPrompts: settings.writingPrompts === false })}
+      />
+
       <FieldLabel>Book title</FieldLabel>
       <TextInput value={settings.bookTitle} onChangeText={(bookTitle) => patchSettings({ bookTitle })} style={input(theme)} />
       <FieldLabel>Your name</FieldLabel>

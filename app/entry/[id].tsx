@@ -1,11 +1,12 @@
 import { router, useLocalSearchParams, type Href } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BackHandler, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { BackHandler, Platform, Pressable, ScrollView, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BuddyView } from '@/src/buddies/BuddyView';
 import { getBuddy } from '@/src/buddies/catalog';
 import { EntryExtras } from '@/src/components/EntryExtras';
+import { HorizontalStrip } from '@/src/components/HorizontalStrip';
 import { MoodPicker } from '@/src/components/MoodPicker';
 import { FontFields } from '@/src/components/FontFields';
 import { PhotoNoteLayer } from '@/src/components/PhotoNoteLayer';
@@ -21,7 +22,8 @@ import { promptForDate } from '@/src/data/prompts';
 import { canUseItem } from '@/src/logic/access';
 import { packIsListed } from '@/src/logic/packs';
 import { birthdayFrom, shopToday } from '@/src/logic/seasons';
-import { addDays, formatLong, todayKey } from '@/src/logic/dates';
+import { pageNeighbors } from '@/src/logic/bookPages';
+import { formatLong, todayKey } from '@/src/logic/dates';
 import { uid } from '@/src/logic/id';
 import { writingStreak } from '@/src/logic/streak';
 import { collageSlots, type CollagePreset } from '@/src/logic/collage';
@@ -36,6 +38,8 @@ import { ThemeOverride, useTheme } from '@/src/theme/BookTheme';
 import { resolveEntryLook, type ColorDesign } from '@/src/theme/designs';
 import { applyType, FONT_CHOICES, INK_SWATCHES, sanitizeInk } from '@/src/theme/fonts';
 import { THEMES, getTheme, type ThemeId } from '@/src/theme/themes';
+
+const webScroll = { touchAction: 'manipulation', overscrollBehaviorY: 'contain', WebkitOverflowScrolling: 'touch' } as const;
 
 type Draft = {
   id: string;
@@ -166,6 +170,9 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
   const [editing, setEditing] = useState(false);
   const [scrollOn, setScrollOn] = useState(true);
   const leaving = useRef(false);
+  const scrollRef = useRef<{ getScrollableNode?: () => { style: CSSStyleDeclaration }; style?: CSSStyleDeclaration } | null>(null);
+  const screen = useWindowDimensions();
+  const pageMin = Math.max(640, screen.height - insets.top - 132);
   const flipRef = useRef<PageFlipHandle>(null);
   const review = useReviewMoment();
   const prompt = promptForDate(draft.date);
@@ -244,31 +251,22 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
     else go();
   }
 
-  function stepEntry(delta: number) {
+  function pagesInBook() {
     const bookId = draft.bookId ?? settings.activeBookId;
-    const ordered = entries
-      .filter((entry) => (entry.bookId ?? 'daily') === bookId)
-      .sort((a, b) => a.date.localeCompare(b.date) || a.createdAt - b.createdAt);
-    const index = ordered.findIndex((entry) => entry.id === draft.id);
-    const neighbor = ordered[index + delta];
-    if (neighbor) {
-      router.replace(`/entry/${neighbor.id}` as Href);
-      return;
-    }
-    setDraft({ ...draft, date: addDays(draft.date, delta) });
+    return entries.filter((entry) => (entry.bookId ?? 'daily') === bookId);
+  }
+
+  function stepEntry(delta: number) {
+    const { prev, next } = pageNeighbors(pagesInBook(), draft);
+    const neighbor = delta > 0 ? next : prev;
+    if (neighbor) router.replace(`/entry/${neighbor.id}` as Href);
   }
 
   const neighbors = useMemo(() => {
     const bookId = draft.bookId ?? settings.activeBookId;
-    const ordered = entries
-      .filter((entry) => (entry.bookId ?? 'daily') === bookId)
-      .sort((a, b) => a.date.localeCompare(b.date) || a.createdAt - b.createdAt);
-    const index = ordered.findIndex((entry) => entry.id === draft.id);
-    return {
-      prev: index > 0 ? ordered[index - 1] : null,
-      next: index >= 0 && index < ordered.length - 1 ? ordered[index + 1] : null,
-    };
-  }, [draft.bookId, draft.id, entries, settings.activeBookId]);
+    const pages = entries.filter((entry) => (entry.bookId ?? 'daily') === bookId);
+    return pageNeighbors(pages, draft);
+  }, [draft, entries, settings.activeBookId]);
 
   function pageNeedsSave(latest: Draft): boolean {
   const content = latest.title.trim() || latest.body.trim() || latest.photos.length > 0 || latest.stickers.length > 0 || latest.photoPlacements.length > 0 || latest.notes.length > 0 || latest.photoOnly || latest.themeOverride || latest.design || latest.fontId || latest.inkColor;
@@ -353,20 +351,32 @@ function updateSticker(next: StickerPlacement) {
         <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>{toast || (saved ? 'On this device' : 'Not saved yet')}</Text>
         <Pressable onPress={() => setConfirmDelete(true)}><Text style={{ color: theme.colors.danger, fontFamily: theme.body }}>Delete</Text></Pressable>
       </View>
-      <ScrollView style={{ flex: 1 }} scrollEnabled={scrollOn} contentContainerStyle={{ padding: 16, paddingBottom: decorate ? 12 : 40 }} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        ref={scrollRef as never}
+        style={[{ flex: 1 }, webScroll]}
+        scrollEnabled={scrollOn}
+        contentContainerStyle={{ flexGrow: 1, padding: 16, paddingBottom: decorate ? 12 : 40 }}
+        keyboardShouldPersistTaps="handled"
+      >
         <PageFlip
           ref={flipRef}
           flipKey={`${draft.id}:${draft.date}`}
           editing={editing}
           canNext={Boolean(neighbors.next)}
           canPrev={Boolean(neighbors.prev)}
-          onScrollLock={setScrollOn}
+          onScrollLock={(enabled) => {
+            const node = scrollRef.current;
+            const el = node?.getScrollableNode?.() ?? node;
+            if (el?.style) el.style.overflowY = enabled ? 'auto' : 'hidden';
+            if (Platform.OS !== 'web') setScrollOn(enabled);
+          }}
+          style={{ flexGrow: 1, minHeight: pageMin }}
           onCommit={(direction) => stepEntry(direction === 'next' ? 1 : -1)}
           nextSheet={neighbors.next ? <NeighborPage entry={neighbors.next} book={settings.books.find((book) => book.id === (neighbors.next?.bookId ?? settings.activeBookId))} premium={wallet.premium} /> : <EndPaper edge="end" />}
           prevSheet={neighbors.prev ? <NeighborPage entry={neighbors.prev} book={settings.books.find((book) => book.id === (neighbors.prev?.bookId ?? settings.activeBookId))} premium={wallet.premium} /> : <EndPaper edge="start" />}
         >
         <View onLayout={(event) => setPageSize({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height })}>
-          <Paper style={{ minHeight: 640 }}>
+          <Paper style={{ flexGrow: 1, minHeight: pageMin }}>
             <View pointerEvents={decorate ? 'none' : 'auto'} style={[padding, { zIndex: 80, position: 'relative', paddingBottom: 0 }]}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Pressable accessibilityLabel="Previous page" onPress={() => turnPage(-1)}><Text style={{ color: theme.colors.paperInk, fontSize: 20 }}>‹</Text></Pressable>
@@ -425,6 +435,7 @@ function updateSticker(next: StickerPlacement) {
               onChangeNote={(next) => setDraft({ ...draft, notes: draft.notes.map((item) => (item.id === next.id ? next : item)) })}
               onEditNote={(id, text) => setDraft({ ...draft, notes: draft.notes.map((item) => (item.id === id ? { ...item, text } : item)) })}
               onEditing={setEditing}
+              decorate={decorate}
             />
             {buddy ? (
               <View
@@ -484,13 +495,13 @@ function updateSticker(next: StickerPlacement) {
                 router.push(`/color-designer?target=page&entry=${draft.id}` as Href);
               }}
             />
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+            <HorizontalStrip contentContainerStyle={{ gap: 8 }}>
               {THEMES.map((item) => (
                 <Pressable key={item.id} onPress={() => { if (item.premium && !wallet.premium) { router.push('/paywall' as Href); return; } setDraft({ ...draft, themeOverride: item.id }); }} style={{ padding: 10, borderRadius: 12, backgroundColor: item.colors.paper, borderWidth: draft.themeOverride === item.id ? 2 : 0, borderColor: item.colors.accent, opacity: item.premium && !wallet.premium ? 0.55 : 1 }}>
                   <Text style={{ color: item.colors.paperInk, fontFamily: item.body }}>{item.emoji} {item.name}{item.premium ? ' · Plus' : ''}</Text>
                 </Pressable>
               ))}
-            </ScrollView>
+            </HorizontalStrip>
           </View>
         ) : null}
       </ScrollView>
@@ -537,7 +548,7 @@ function updateSticker(next: StickerPlacement) {
               ) : null}
             </View>
           ) : null}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 6 }}>
+          <HorizontalStrip contentContainerStyle={{ gap: 8, paddingBottom: 6 }}>
             <Button label="Photos" tone="ghost" onPress={async () => {
               const result = await pickDiaryPhotos();
               if ('error' in result) {
@@ -564,9 +575,9 @@ function updateSticker(next: StickerPlacement) {
               <Button key={preset} label={preset === 'two' ? '2-up' : preset === 'three' ? '3-up' : preset === 'grid' ? 'Grid' : preset === 'scatter' ? 'Scatter' : 'Full'} tone="ghost" onPress={() => applyCollage(preset)} />
             ))}
             <Button label="Page text" tone={selectedId === PAGE_TEXT_ID ? 'primary' : 'ghost'} onPress={() => setSelectedId(PAGE_TEXT_ID)} />
-          </ScrollView>
+          </HorizontalStrip>
           {selectedNote ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
+            <HorizontalStrip contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
               {FONT_CHOICES.map((font) => (
                 <Pressable key={font.id} onPress={() => setDraft({ ...draft, notes: draft.notes.map((item) => (item.id === selectedNote.id ? { ...item, fontId: font.id } : item)) })} style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: selectedNote.fontId === font.id ? theme.colors.accent : theme.colors.chip }}>
                   <Text style={{ color: selectedNote.fontId === font.id ? theme.colors.onAccent : theme.colors.chipInk, fontFamily: font.script }}>{font.name}</Text>
@@ -575,16 +586,16 @@ function updateSticker(next: StickerPlacement) {
               {INK_SWATCHES.slice(0, 12).map((hex) => (
                 <Pressable key={hex} accessibilityLabel={`Note ink ${hex}`} onPress={() => setDraft({ ...draft, notes: draft.notes.map((item) => (item.id === selectedNote.id ? { ...item, inkColor: hex } : item)) })} style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: hex, borderWidth: selectedNote.inkColor === hex ? 2 : 0, borderColor: theme.colors.accent }} />
               ))}
-            </ScrollView>
+            </HorizontalStrip>
           ) : null}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+          <HorizontalStrip contentContainerStyle={{ gap: 8 }}>
             {listedPacks.map((pack) => (
               <Pressable key={pack.id} onPress={() => setPackId(pack.id)} style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: activePack.id === pack.id ? theme.colors.accent : theme.colors.chip }}>
                 <Text style={{ color: activePack.id === pack.id ? theme.colors.onAccent : theme.colors.chipInk, fontFamily: theme.body, fontSize: 12 }}>{pack.name}</Text>
               </Pressable>
             ))}
-          </ScrollView>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingTop: 8 }}>
+          </HorizontalStrip>
+          <HorizontalStrip contentContainerStyle={{ gap: 8, paddingTop: 8 }}>
             {stickersInPack(activePack.id).map((sticker) => {
               const owned = canUseItem(sticker, { ownedIds: wallet.ownedStickerIds, premium: wallet.premium && !activePack.seasonal });
               const plusPack = Boolean(activePack.premium) && !wallet.premium;
@@ -626,7 +637,7 @@ function updateSticker(next: StickerPlacement) {
                 </Pressable>
               );
             })}
-          </ScrollView>
+          </HorizontalStrip>
         </View>
       ) : (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 12, paddingBottom: Math.max(insets.bottom, 12) }}>

@@ -6,3 +6,10 @@ export const decorationDrag = makeMutable(0);
 export function holdDecoration(held: boolean) {
   decorationDrag.value = held ? 1 : 0;
 }
+
+/** Set while a finger is down on a horizontal strip (emojis, stickers, fonts, inks). */
+export const stripTouch = makeMutable(0);
+
+export function holdStrip(held: boolean) {
+  stripTouch.value = held ? 1 : 0;
+}

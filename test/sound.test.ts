@@ -56,6 +56,8 @@ describe('sounds', () => {
   it('locks a sideways swipe and leaves typing and vertical drags alone', () => {
     assert.equal(claimHorizontalSwipe(40, 4, false), true);
     assert.equal(claimHorizontalSwipe(-30, 6, false), true);
+    assert.equal(claimHorizontalSwipe(24, 12, false), true);
+    assert.equal(claimHorizontalSwipe(18, 14, false), false);
     assert.equal(claimHorizontalSwipe(8, 2, false), false);
     assert.equal(claimHorizontalSwipe(10, 40, false), false);
     assert.equal(claimHorizontalSwipe(40, 4, true), false);

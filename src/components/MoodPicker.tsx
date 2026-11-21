@@ -1,13 +1,14 @@
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { MOODS, type MoodId } from '../data/moods';
 import { playMoodSound } from '../services/sounds';
 import { useTheme } from '../theme/BookTheme';
+import { HorizontalStrip } from './HorizontalStrip';
 
 export function MoodPicker({ value, onChange }: { value: MoodId; onChange: (mood: MoodId) => void }) {
   const theme = useTheme();
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
+    <HorizontalStrip contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
       {MOODS.map((mood) => {
         const selected = mood.id === value;
         return (
@@ -33,7 +34,7 @@ export function MoodPicker({ value, onChange }: { value: MoodId; onChange: (mood
           </Pressable>
         );
       })}
-    </ScrollView>
+    </HorizontalStrip>
   );
 }
 

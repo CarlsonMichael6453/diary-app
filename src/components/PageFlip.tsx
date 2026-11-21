@@ -1,10 +1,8 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
-import { curlLayout, foldAngle } from '../logic/curl';
 import { decorationDrag, drawingLock, stripTouch } from '../logic/pageGesture';
 import { claimHorizontalSwipe, releaseCurl, verticalScrollWins } from '../logic/swipe';
 import { playCurlCommit } from '../services/sounds';
@@ -15,8 +13,6 @@ export type PageFlipHandle = {
   cancel: () => void;
   finish: (direction: 'next' | 'prev', done: () => void, force?: boolean) => void;
 };
-
-const CURL_LIGHT = ['rgba(48,28,24,0.55)', 'rgba(90,60,40,0.12)', 'rgba(255,252,246,0.78)', 'rgba(255,248,236,0.2)', 'rgba(70,48,36,0.34)'] as const;
 
 let handoff = false;
 
@@ -30,7 +26,59 @@ function consumeHandoff() {
   return skip;
 }
 
-/** A soft paper curl. The fold stays on the finger, on the UI thread, and the neighbor page is already mounted underneath. */
+type CurlCorner = 'tr' | 'br' | 'tl' | 'bl';
+
+function curlGeometry(w: number, h: number, progress: number, corner: CurlCorner, incoming: boolean) {
+  const cx = corner[1] === 'r' ? w : 0;
+  const cy = corner[0] === 'b' ? h : 0;
+  const ux = corner[1] === 'r' ? -1 : 1;
+  const uy = corner[0] === 'b' ? -1 : 1;
+  const len = Math.hypot(ux, uy);
+  const uxv = ux / len;
+  const uyv = uy / len;
+  const dot = (x: number, y: number) => (x - cx) * uxv + (y - cy) * uyv;
+  const dMax = Math.max(dot(0, 0), dot(w, 0), dot(0, h), dot(w, h));
+  const clamped = Math.max(0, Math.min(1, progress));
+  const d = clamped * dMax;
+  const band = Math.min(w, h) * 0.24 * Math.sin(clamped * Math.PI);
+  const hits = (dist: number) => {
+    const pts: number[][] = [];
+    const add = (x: number, y: number) => {
+      if (x >= -1.5 && x <= w + 1.5 && y >= -1.5 && y <= h + 1.5) pts.push([Math.min(w, Math.max(0, x)), Math.min(h, Math.max(0, y))]);
+    };
+    add(cx + (dist - (0 - cy) * uyv) / uxv, 0);
+    add(cx + (dist - (h - cy) * uyv) / uxv, h);
+    add(0, cy + (dist - (0 - cx) * uxv) / uyv);
+    add(w, cy + (dist - (w - cx) * uxv) / uyv);
+    return pts.filter((pt, index) => pts.findIndex((other) => Math.hypot(other[0] - pt[0], other[1] - pt[1]) < 2) === index);
+  };
+  const sort = (pts: number[][]) => {
+    if (pts.length < 3) return pts;
+    const mx = pts.reduce((sum, pt) => sum + pt[0], 0) / pts.length;
+    const my = pts.reduce((sum, pt) => sum + pt[1], 0) / pts.length;
+    return pts.slice().sort((a, b) => Math.atan2(a[1] - my, a[0] - mx) - Math.atan2(b[1] - my, b[0] - mx));
+  };
+  const corners = [[0, 0], [w, 0], [w, h], [0, h]];
+  const front = sort([...corners.filter(([x, y]) => (incoming ? dot(x, y) <= d + 0.8 : dot(x, y) >= d - 0.8)), ...hits(d)]);
+  const low = incoming ? d : Math.max(0, d - band);
+  const high = incoming ? d + band : d;
+  const back = sort([
+    ...corners.filter(([x, y]) => {
+      const value = dot(x, y);
+      return value >= low - 0.8 && value <= high + 0.8;
+    }),
+    ...hits(low),
+    ...hits(high),
+  ]);
+  return { front, back, hits: hits(d), uxv, uyv, band };
+}
+
+function curlPolygon(pts: number[][]) {
+  if (pts.length < 3) return 'polygon(0px 0px, 0px 0px, 0px 0px)';
+  return `polygon(${pts.map((pt) => `${pt[0].toFixed(1)}px ${pt[1].toFixed(1)}px`).join(',')})`;
+}
+
+/** A corner curl that plays itself out. The neighbor page is already mounted underneath. */
 export const PageFlip = forwardRef<
   PageFlipHandle,
   {
@@ -67,6 +115,11 @@ export const PageFlip = forwardRef<
   commitRef.current = onCommit;
   const reduceRef = useRef(reduce);
   reduceRef.current = reduce;
+  const paperRef = useRef(theme.colors.paper);
+  paperRef.current = theme.colors.paper;
+  const playRef = useRef<(direction: 'next' | 'prev', top: boolean) => void>(() => {});
+  const curlRef = useRef<(direction: 'next' | 'prev', top: boolean, onDone: () => void) => void>(() => {});
+  const stopCurlRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     canNextSV.value = canNext ? 1 : 0;
@@ -90,21 +143,25 @@ export const PageFlip = forwardRef<
     commitRef.current?.(direction);
   }
 
-  const nativeFinish = useRef<(() => void) | null>(null);
-  function armNativeTurn(commit: boolean, direction: 'next' | 'prev') {
-    let done = false;
-    const finish = () => {
-      if (done) return;
-      done = true;
+  function playTurnFromJS(direction: 'next' | 'prev', top: boolean) {
+    if (Platform.OS === 'web') {
+      playRef.current(direction, top);
+      return;
+    }
+    const blocked = direction === 'next' ? canNextSV.value < 1 : canPrevSV.value < 1;
+    if (blocked || drawingLock.value > 0) return;
+    side.value = direction === 'next' ? -1 : 1;
+    fingerY.value = top ? 1 : 0;
+    fingerX.value = direction === 'next' ? 0 : 1;
+    markHandoff();
+    const go = () => {
       side.value = 0;
-      fingerX.value = width.value || 1;
-      if (commit) commitSwipe(direction);
+      fingerX.value = 0;
+      commitSwipe(direction);
     };
-    nativeFinish.current = finish;
-    setTimeout(finish, commit ? 780 : 560);
-  }
-  function finishNativeTurn() {
-    nativeFinish.current?.();
+    fingerX.value = withTiming(direction === 'next' ? 1 : 0, { duration: 520, easing: Easing.out(Easing.cubic) }, (finished) => {
+      if (finished) runOnJS(go)();
+    });
   }
 
   const arrived = useRef('');
@@ -124,44 +181,37 @@ export const PageFlip = forwardRef<
       return;
     }
     side.value = 0;
-    fingerX.value = w;
+    fingerX.value = 0;
     playCurlCommit();
   }, [flipKey, pageW, fingerX, side, width]);
 
   useImperativeHandle(ref, () => ({
     cancel() {
-      const w = width.value || 1;
-      const rest = side.value < 0 ? w : 0;
-      fingerX.value = withSpring(rest, { damping: 20, stiffness: 280, mass: 0.5 }, (finished) => {
-        if (finished) side.value = 0;
-      });
+      side.value = 0;
+      fingerX.value = 0;
+      stopCurlRef.current();
     },
     finish(direction, done, force = false) {
       const blocked = direction === 'next' ? canNextSV.value < 1 : canPrevSV.value < 1;
-      const w = width.value || pageW || 1;
-      if (blocked && !force) {
-        side.value = direction === 'next' ? -1 : 1;
-        fingerY.value = (height.value || 400) / 2;
-        fingerX.value = direction === 'next' ? w * 0.78 : w * 0.22;
-        fingerX.value = withTiming(direction === 'next' ? w : 0, { duration: 280, easing: Easing.out(Easing.cubic) }, (finished) => {
-          if (finished) side.value = 0;
-        });
+      if (blocked && !force) return;
+      markHandoff();
+      const go = () => landed(done);
+      if (Platform.OS === 'web') {
+        curlRef.current(direction, true, go);
         return;
       }
-      markHandoff();
       side.value = direction === 'next' ? -1 : 1;
-      fingerY.value = (height.value || 400) / 2;
-      const target = direction === 'next' ? 0 : w;
-      const go = () => landed(done);
+      fingerY.value = 1;
+      fingerX.value = direction === 'next' ? 0 : 1;
       if (reduceRef.current) {
         runOnJS(go)();
         return;
       }
-      fingerX.value = withTiming(target, { duration: 240, easing: Easing.out(Easing.cubic) }, (finished) => {
+      fingerX.value = withTiming(direction === 'next' ? 1 : 0, { duration: 520, easing: Easing.out(Easing.cubic) }, (finished) => {
         if (finished) runOnJS(go)();
       });
     },
-  }), [fingerX, fingerY, side, width, height, canNextSV, canPrevSV, pageW]);
+  }), [fingerX, fingerY, side, height, canNextSV, canPrevSV]);
 
   const gesture = useMemo(
     () =>
@@ -181,117 +231,79 @@ export const PageFlip = forwardRef<
           'worklet';
           runOnJS(lock)(true);
         })
-        .onUpdate((event) => {
-          'worklet';
-          const w = width.value || 1;
-          const h = height.value || 1;
-          const nextward = event.translationX <= 0;
-          const blocked = nextward ? canNextSV.value < 1 : canPrevSV.value < 1;
-          let x = event.x;
-          if (blocked) {
-            const pull = Math.max(-w * 0.28, Math.min(w * 0.28, event.translationX * 0.32));
-            x = nextward ? w + Math.min(0, pull) : Math.max(0, pull);
-          }
-          fingerX.value = Math.max(0, Math.min(w, x));
-          fingerY.value = Math.max(0, Math.min(h, event.y));
-          side.value = nextward ? -1 : 1;
-        })
         .onFinalize((event) => {
           'worklet';
           runOnJS(lock)(false);
           armed.value = 0;
-          if (side.value === 0) return;
+          if (drawingLock.value > 0) return;
           const w = width.value || 1;
-          const direction = side.value < 0 ? 'next' : 'prev';
-          const reveal = direction === 'next' ? (w - fingerX.value) / w : fingerX.value / w;
+          const h = height.value || 1;
+          const direction = event.translationX <= 0 ? 'next' : 'prev';
+          const reveal = Math.abs(event.translationX) / w;
           const blocked = direction === 'next' ? canNextSV.value < 1 : canPrevSV.value < 1;
-          const decision = releaseCurl(direction, reveal, event.velocityX, blocked);
-          const target = decision === 'commit' ? (direction === 'next' ? 0 : w) : direction === 'next' ? w : 0;
-          if (decision === 'commit') markHandoff();
-          runOnJS(armNativeTurn)(decision === 'commit', direction);
-          fingerX.value = withSpring(target, { velocity: event.velocityX, damping: 22, stiffness: 190, mass: 0.7, overshootClamping: true }, (finished) => {
-            if (finished) runOnJS(finishNativeTurn)();
-          });
+          if (releaseCurl(direction, reveal, event.velocityX, blocked) !== 'commit') return;
+          runOnJS(playTurnFromJS)(direction, event.y < h / 2);
         }),
     [armed, canNextSV, canPrevSV, editingSV, fingerX, fingerY, height, originX, originY, reduceSV, side, width],
   );
 
   const fadeStyle = useAnimatedStyle(() => {
-    if (!reduceSV.value) return { opacity: 1 };
-    const w = width.value || 1;
-    const reveal = side.value === 0 ? 0 : side.value < 0 ? (w - fingerX.value) / w : fingerX.value / w;
-    return { opacity: 1 - Math.min(0.65, reveal) };
+    if (!reduceSV.value || side.value === 0) return { opacity: 1 };
+    return { opacity: 1 - Math.min(1, fingerX.value) };
   });
 
   const currentStyle = useAnimatedStyle(() => {
     const w = width.value || 1;
     const h = height.value || 1;
-    if (reduceSV.value || side.value !== -1) return { width: w, clipPath: 'none' };
-    const layout = curlLayout(fingerX.value, fingerY.value, w, h, 'next');
-    if (Platform.OS !== 'web') return { width: Math.max(0, layout.foldX) };
-    const slope = Math.tan((layout.angle * Math.PI) / 180);
-    const x0 = layout.foldX + (0 - fingerY.value) * slope;
-    const x1 = layout.foldX + (h - fingerY.value) * slope;
+    if (reduceSV.value || side.value !== -1) return { opacity: 1, transform: [], willChange: 'transform' } as object;
+    const progress = fingerX.value;
+    const top = fingerY.value > 0.5;
+    const angleY = -progress * 150;
+    const angleZ = (top ? -1 : 1) * progress * 18;
+    const originY = top ? -h / 2 : h / 2;
     return {
-      width: w,
-      clipPath: `polygon(0px 0px, ${x0}px 0px, ${x1}px ${h}px, 0px ${h}px)`,
-      willChange: 'clip-path, transform',
+      opacity: 1,
+      transform: [
+        { perspective: 1100 },
+        { translateX: w / 2 },
+        { translateY: originY },
+        { rotateZ: `${angleZ}deg` },
+        { rotateY: `${angleY}deg` },
+        { translateX: -w / 2 },
+        { translateY: -originY },
+      ],
+      willChange: 'transform',
     } as object;
   });
 
   const prevStyle = useAnimatedStyle(() => {
     const w = width.value || 1;
     const h = height.value || 1;
-    if (reduceSV.value || side.value !== 1) return { width: 0, opacity: 0, clipPath: 'none' };
-    const layout = curlLayout(fingerX.value, fingerY.value, w, h, 'prev');
-    if (Platform.OS !== 'web') return { opacity: 1, width: Math.max(0, layout.foldX) };
-    const slope = Math.tan((layout.angle * Math.PI) / 180);
-    const x0 = layout.foldX + (0 - fingerY.value) * slope;
-    const x1 = layout.foldX + (h - fingerY.value) * slope;
+    if (side.value !== 1) return { opacity: 0, transform: [{ translateX: -8 }], willChange: 'transform' } as object;
+    const progress = fingerX.value;
+    const top = fingerY.value > 0.5;
+    const angleY = progress * 150;
+    const angleZ = (top ? 1 : -1) * progress * 18;
+    const originY = top ? -h / 2 : h / 2;
     return {
       opacity: 1,
-      width: w,
-      clipPath: `polygon(0px 0px, ${x0}px 0px, ${x1}px ${h}px, 0px ${h}px)`,
-      willChange: 'clip-path, transform',
-    } as object;
-  });
-
-  const foldStyle = useAnimatedStyle(() => {
-    const w = width.value || 1;
-    const h = height.value || 1;
-    const which = side.value < 0 ? 'next' : side.value > 0 ? 'prev' : 'flat';
-    const layout = curlLayout(fingerX.value, fingerY.value, w, h, which);
-    if (reduceSV.value || layout.side === 'flat') return { opacity: 0, width: 0 };
-    return {
-      opacity: 1,
-      width: 16,
       transform: [
-        { translateX: layout.foldX - 8 },
-        { translateY: fingerY.value - h / 2 },
-        { rotate: `${layout.angle}deg` },
-        { translateY: -(fingerY.value - h / 2) },
+        { perspective: 1100 },
+        { translateX: -w / 2 },
+        { translateY: originY },
+        { rotateZ: `${angleZ}deg` },
+        { rotateY: `${angleY}deg` },
+        { translateX: w / 2 },
+        { translateY: -originY },
       ],
       willChange: 'transform',
     } as object;
   });
 
   const shadowStyle = useAnimatedStyle(() => {
-    const w = width.value || 1;
-    const h = height.value || 1;
-    const which = side.value < 0 ? 'next' : side.value > 0 ? 'prev' : 'flat';
-    const layout = curlLayout(fingerX.value, fingerY.value, w, h, which);
-    if (reduceSV.value || layout.side === 'flat') return { opacity: 0, width: 0 };
-    return {
-      opacity: 0.9,
-      width: 28,
-      transform: [
-        { translateX: layout.foldX + 6 },
-        { translateY: fingerY.value - h / 2 },
-        { rotate: `${layout.angle}deg` },
-        { translateY: -(fingerY.value - h / 2) },
-      ],
-      willChange: 'transform',
-    } as object;
+    if (reduceSV.value || side.value === 0) return { opacity: 0 };
+    const reveal = side.value < 0 ? fingerX.value : 1 - fingerX.value;
+    return { opacity: 0.22 + reveal * 0.25 };
   });
 
   const boxRef = useRef<any>(null);
@@ -354,43 +366,129 @@ export const PageFlip = forwardRef<
       }
       drag.lastX = clientX;
       drag.lastT = timeStamp;
-      const w = width.value || 1;
-      const h = height.value || 1;
-      const nextward = dx <= 0;
-      const blocked = nextward ? !edgeRef.current.canNext : !edgeRef.current.canPrev;
-      let fold = clientX - drag.left;
-      if (blocked) {
-        const pull = Math.max(-w * 0.28, Math.min(w * 0.28, dx * 0.32));
-        fold = nextward ? w + Math.min(0, pull) : Math.max(0, pull);
-      }
-      fingerX.value = Math.max(0, Math.min(w, fold));
-      fingerY.value = Math.max(0, Math.min(h, clientY - drag.top));
-      side.value = nextward ? -1 : 1;
     };
     const move = (event: PointerEvent) => {
       if (!drag || event.pointerType === 'touch') return;
       follow(event.clientX, event.clientY, event.timeStamp);
     };
-    const settle = (commit: boolean, direction: 'next' | 'prev', releaseVelocity = 0) => {
-      if (settling) return;
+    const byId = (id: string) => pageNode()?.querySelector(`#${id}`) as HTMLElement | null;
+    const clearCurl = () => {
+      for (const id of ['curl-leaf', 'curl-prev', 'curl-flap', 'curl-shadow', 'curl-fold']) {
+        const el = byId(id);
+        if (!el) continue;
+        el.style.clipPath = '';
+        el.style.setProperty('-webkit-clip-path', '');
+        if (id !== 'curl-leaf') {
+          el.style.opacity = '0';
+          el.style.visibility = 'hidden';
+          el.style.transform = '';
+        }
+      }
+    };
+    const paintCurl = (direction: 'next' | 'prev', top: boolean, amount: number) => {
+      const root = pageNode() as HTMLElement | null;
+      if (!root) return;
+      const w = root.clientWidth || 1;
+      const h = root.clientHeight || 1;
+      const incoming = direction === 'prev';
+      const corner: CurlCorner = direction === 'next' ? (top ? 'tr' : 'br') : top ? 'tl' : 'bl';
+      const shape = curlGeometry(w, h, amount, corner, incoming);
+      const leaf = byId('curl-leaf');
+      const prev = byId('curl-prev');
+      const flap = byId('curl-flap');
+      const shadow = byId('curl-shadow');
+      const fold = byId('curl-fold');
+      const page = incoming ? prev : leaf;
+      if (leaf && incoming) {
+        leaf.style.clipPath = '';
+        leaf.style.setProperty('-webkit-clip-path', '');
+      }
+      if (prev) {
+        prev.style.visibility = incoming ? 'visible' : 'hidden';
+        prev.style.opacity = incoming ? '1' : '0';
+      }
+      if (page) {
+        const clip = curlPolygon(shape.front);
+        page.style.clipPath = clip;
+        page.style.setProperty('-webkit-clip-path', clip);
+      }
+      if (flap && shape.back.length >= 3 && amount > 0.02 && amount < 0.985) {
+        const clip = curlPolygon(shape.back);
+        flap.style.visibility = 'visible';
+        flap.style.opacity = '1';
+        flap.style.background = `linear-gradient(148deg, rgba(255,252,246,0.82), rgba(176,132,104,0.38)), ${paperRef.current}`;
+        flap.style.clipPath = clip;
+        flap.style.setProperty('-webkit-clip-path', clip);
+      } else if (flap) {
+        flap.style.opacity = '0';
+      }
+      const towardX = incoming ? shape.uxv : -shape.uxv;
+      const towardY = incoming ? shape.uyv : -shape.uyv;
+      const place = (el: HTMLElement | null, bar: number, shift: boolean) => {
+        if (!el || shape.hits.length < 2) {
+          if (el) el.style.opacity = '0';
+          return;
+        }
+        const [a, b] = shape.hits;
+        const fx = b[0] - a[0];
+        const fy = b[1] - a[1];
+        let ang = (Math.atan2(fy, fx) * 180) / Math.PI;
+        if (fy * towardX + -fx * towardY < 0) ang += 180;
+        const reach = shift ? Math.max(48, shape.band * 0.9) : 0;
+        const destX = (a[0] + b[0]) / 2 + towardX * reach;
+        const destY = (a[1] + b[1]) / 2 + towardY * reach;
+        el.style.visibility = 'visible';
+        el.style.opacity = '1';
+        el.style.transform = `translate(${destX - 800}px, ${destY - bar / 2}px) rotate(${ang}deg)`;
+      };
+      if (shadow) shadow.style.background = 'linear-gradient(to bottom, rgba(36,22,18,0.55), rgba(36,22,18,0))';
+      place(shadow, 92, true);
+      place(fold, 4, false);
+    };
+    let curlFrame = 0;
+    const runCurl = (direction: 'next' | 'prev', top: boolean, onDone: () => void) => {
+      if (settling || drawingLock.value > 0) return;
+      const blocked = direction === 'next' ? !edgeRef.current.canNext : !edgeRef.current.canPrev;
+      if (blocked) return;
       settling = true;
-      const w = width.value || 1;
-      const target = commit ? (direction === 'next' ? 0 : w) : direction === 'next' ? w : 0;
+      lock(true);
+      markHandoff();
       let finishedOnce = false;
       const complete = () => {
         if (finishedOnce) return;
         finishedOnce = true;
+        if (curlFrame) cancelAnimationFrame(curlFrame);
         settling = false;
-        side.value = 0;
-        fingerX.value = w;
-        if (commit) commitSwipe(direction);
+        clearCurl();
+        lock(false);
+        onDone();
       };
-      if (commit) markHandoff();
-      fingerX.value = withSpring(target, { velocity: releaseVelocity, damping: commit ? 22 : 26, stiffness: commit ? 180 : 240, mass: 0.75, overshootClamping: true }, () => {
-        runOnJS(complete)();
-      });
-      window.setTimeout(complete, commit ? 720 : 520);
+      let timer = 0;
+      stopCurlRef.current = () => {
+        if (curlFrame) cancelAnimationFrame(curlFrame);
+        window.clearTimeout(timer);
+        settling = false;
+        clearCurl();
+        lock(false);
+      };
+      if (reduceRef.current) {
+        complete();
+        return;
+      }
+      const start = performance.now();
+      const tick = (now: number) => {
+        const t = Math.min(1, (now - start) / 540);
+        const eased = 1 - (1 - t) ** 3;
+        paintCurl(direction, top, eased);
+        if (t < 1) curlFrame = requestAnimationFrame(tick);
+        else complete();
+      };
+      curlFrame = requestAnimationFrame(tick);
+      timer = window.setTimeout(complete, 760);
     };
+    const play = (direction: 'next' | 'prev', top: boolean) => runCurl(direction, top, () => commitSwipe(direction));
+    playRef.current = play;
+    curlRef.current = runCurl;
     const up = (event: PointerEvent) => {
       const current = drag;
       drag = null;
@@ -403,9 +501,10 @@ export const PageFlip = forwardRef<
         const interactive = target?.closest?.('button, a, input, textarea, [data-no-page-turn], [data-decoration]');
         const tap = Math.abs(event.clientX - current.x) < 14 && Math.abs(event.clientY - current.y) < 14;
         if (tap && current.field) current.field.focus();
+        const topTap = event.clientY - current.top < (height.value || 1) / 2;
         if (!interactive && tap) {
-          if (localX > w * 0.82 && edgeRef.current.canNext) settle(true, 'next');
-          else if (localX < w * 0.18 && edgeRef.current.canPrev) settle(true, 'prev');
+          if (localX > w * 0.82 && edgeRef.current.canNext) play( 'next', topTap);
+          else if (localX < w * 0.18 && edgeRef.current.canPrev) play('prev', topTap);
         }
         return;
       }
@@ -418,8 +517,7 @@ export const PageFlip = forwardRef<
       const direction = net <= 0 ? 'next' : 'prev';
       const reveal = Math.abs(net) / w;
       const blocked = direction === 'next' ? !edgeRef.current.canNext : !edgeRef.current.canPrev;
-      side.value = direction === 'next' ? -1 : 1;
-      settle(releaseCurl(direction, reveal, velocity, blocked) === 'commit', direction, velocity);
+      if (releaseCurl(direction, reveal, velocity, blocked) === 'commit') play(direction, current.y - current.top < (height.value || 1) / 2);
     };
     const fromTouch = (event: TouchEvent) => {
       const touch = event.changedTouches[0];
@@ -462,7 +560,7 @@ export const PageFlip = forwardRef<
   return (
     <GestureDetector gesture={gesture}>
       <View
-        style={[{ flexGrow: 1, overflow: 'hidden', borderRadius: theme.radius }, style]}
+        style={[{ flexGrow: 1, overflow: 'hidden', borderRadius: theme.radius, perspective: 1200 } as object, style]}
         ref={boxRef}
         nativeID="diary-page"
         testID="diary-page"
@@ -470,30 +568,52 @@ export const PageFlip = forwardRef<
           width.value = event.nativeEvent.layout.width;
           height.value = event.nativeEvent.layout.height;
           setPageW(event.nativeEvent.layout.width);
-          if (side.value === 0) fingerX.value = event.nativeEvent.layout.width;
+          if (side.value === 0) fingerX.value = 0;
         }}
       >
         <View pointerEvents="none" style={StyleSheet.absoluteFill}>{nextSheet}</View>
-        <Animated.View style={fadeStyle}>
-          <Animated.View style={[{ overflow: 'hidden' }, currentStyle]}>
-            <View style={{ width: pageW || '100%', minHeight: '100%', flexGrow: 1 }}>{children}</View>
-          </Animated.View>
-        </Animated.View>
-        <Animated.View pointerEvents="none" style={[styles.prev, prevStyle]}>
-          <View style={{ width: pageW || '100%' }}>{prevSheet}</View>
-        </Animated.View>
-        <Animated.View pointerEvents="none" style={[styles.band, shadowStyle]}>
-          <LinearGradient colors={['rgba(28,16,20,0.28)', 'rgba(28,16,20,0)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
-        </Animated.View>
-        <Animated.View pointerEvents="none" style={[styles.band, foldStyle, { backgroundColor: theme.colors.paper }]}>
-          <LinearGradient colors={CURL_LIGHT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
-        </Animated.View>
+        {Platform.OS === 'web' ? (
+          <>
+            <View nativeID="curl-shadow" pointerEvents="none" style={styles.shadow} />
+            <View nativeID="curl-leaf" style={styles.leaf}>{children}</View>
+            <View nativeID="curl-prev" pointerEvents="none" style={styles.cover}>{prevSheet}</View>
+            <View nativeID="curl-flap" pointerEvents="none" style={styles.flap} />
+            <View nativeID="curl-fold" pointerEvents="none" style={styles.fold} />
+          </>
+        ) : (
+          <>
+            <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, shadowStyle, { backgroundColor: 'rgba(28,16,20,0.18)' }]} />
+            <Animated.View style={[styles.leaf, fadeStyle, currentStyle]}>
+              <View style={styles.face}>{children}</View>
+              <View pointerEvents="none" style={[styles.back, { backgroundColor: theme.colors.paper }]} />
+            </Animated.View>
+            <Animated.View pointerEvents="none" style={[styles.cover, prevStyle]}>
+              <View style={styles.face}>{prevSheet}</View>
+              <View pointerEvents="none" style={[styles.back, { backgroundColor: theme.colors.paper }]} />
+            </Animated.View>
+          </>
+        )}
       </View>
     </GestureDetector>
   );
 });
 
 const styles = StyleSheet.create({
-  prev: { position: 'absolute', top: 0, bottom: 0, left: 0, overflow: 'hidden' },
-  band: { position: 'absolute', top: 0, bottom: 0, overflow: 'hidden' },
+  leaf: { flexGrow: 1, zIndex: 2, backgroundColor: 'transparent' },
+  cover: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 4, opacity: 0 },
+  shadow: { position: 'absolute', left: 0, top: 0, width: 1600, height: 64, zIndex: 3, opacity: 0 },
+  flap: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 5, opacity: 0 },
+  fold: { position: 'absolute', left: 0, top: 0, width: 1600, height: 4, zIndex: 6, opacity: 0, backgroundColor: 'rgba(255,250,242,0.92)' },
+  face: { flexGrow: 1, backfaceVisibility: 'hidden' },
+  back: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backfaceVisibility: 'hidden',
+    transform: [{ rotateY: '180deg' }],
+    borderWidth: 1,
+    borderColor: 'rgba(70,48,36,0.18)',
+  },
 });

@@ -105,7 +105,8 @@ function PlacedSticker({
         height: size,
         transform: [{ rotate: `${placement.rotation}deg` }],
         zIndex,
-      }}
+        touchAction: 'none',
+      } as object}
     >
       <StickerView stickerId={placement.stickerId} size={size} selected={selected} />
       {selected ? <View {...scalePan.panHandlers} style={styles.knob} /> : null}

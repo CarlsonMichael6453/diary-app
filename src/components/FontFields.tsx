@@ -1,8 +1,6 @@
-import { useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { useTheme } from '../theme/BookTheme';
-import { isHexColor } from '../theme/designs';
 import { FONT_CHOICES, INK_SWATCHES } from '../theme/fonts';
 import { Button } from './ui';
 
@@ -20,7 +18,6 @@ export function FontFields({
   onReset?: () => void;
 }) {
   const theme = useTheme();
-  const [custom, setCustom] = useState(inkColor && !INK_SWATCHES.includes(inkColor) ? inkColor : '');
   return (
     <View style={{ gap: 8 }}>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -39,26 +36,10 @@ export function FontFields({
       </View>
       <Text style={{ color: theme.colors.ink, fontFamily: theme.body }}>Ink color</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-        {INK_SWATCHES.map((hex) => (
-          <Pressable key={hex} accessibilityLabel={`Ink ${hex}`} onPress={() => onInk(hex)} style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: hex, borderWidth: inkColor === hex ? 3 : 1, borderColor: inkColor === hex ? theme.colors.accent : '#FFFFFF' }} />
+        {INK_SWATCHES.map((swatch, index) => (
+          <Pressable key={swatch} accessibilityLabel={`Ink swatch ${index + 1}`} onPress={() => onInk(swatch)} style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: swatch, borderWidth: inkColor === swatch ? 3 : 1, borderColor: inkColor === swatch ? theme.colors.accent : '#FFFFFF' }} />
         ))}
       </View>
-      <TextInput
-        value={custom}
-        onChangeText={setCustom}
-        autoCapitalize="none"
-        placeholder="#1A1420"
-        placeholderTextColor={theme.colors.inkSoft}
-        accessibilityLabel="Custom ink color"
-        style={{ backgroundColor: theme.colors.card, color: theme.colors.ink, borderRadius: 12, padding: 10, fontFamily: theme.body, maxWidth: 180 }}
-      />
-      <Button
-        label="Use custom color"
-        tone="ghost"
-        onPress={() => {
-          if (isHexColor(custom.trim())) onInk(custom.trim());
-        }}
-      />
       {onReset ? <Button label="Use default font" tone="ghost" onPress={onReset} /> : null}
     </View>
   );

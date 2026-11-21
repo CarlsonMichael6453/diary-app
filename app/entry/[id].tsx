@@ -29,7 +29,7 @@ import { uid } from '@/src/logic/id';
 import { countReviewEntries } from '@/src/logic/review';
 import { writingStreak } from '@/src/logic/streak';
 import { collageSlots, type CollagePreset } from '@/src/logic/collage';
-import { holdDrawing } from '@/src/logic/pageGesture';
+import { bindPageScroll, holdDrawing, holdPage } from '@/src/logic/pageGesture';
 import { PAGE_TEXT_ID, reorderStack, type LayerMove } from '@/src/logic/layers';
 import type { DiaryEntry, NotePlacement, PhotoFrame, PhotoPlacement, StickerPlacement } from '@/src/models/types';
 import { lightTap } from '@/src/services/haptics';
@@ -186,6 +186,17 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
     holdDrawing(drawingMode);
     return () => holdDrawing(false);
   }, [drawingMode]);
+
+  useEffect(() => {
+    bindPageScroll((enabled) => {
+      const node = scrollRef.current;
+      const el = node?.getScrollableNode?.() ?? node;
+      const allow = enabled && (!drawingMode || drawScroll);
+      if (el?.style) el.style.overflowY = allow ? 'auto' : 'hidden';
+      if (Platform.OS !== 'web') setScrollOn(allow);
+    });
+    return () => bindPageScroll(null);
+  }, [drawingMode, drawScroll]);
 
   useEffect(() => {
     if (Platform.OS !== 'web') return;
@@ -639,7 +650,7 @@ function updateSticker(next: StickerPlacement) {
                 </Pressable>
               ))}
               {INK_SWATCHES.slice(0, 12).map((hex) => (
-                <Pressable key={hex} accessibilityLabel={`Note ink ${hex}`} onPress={() => setDraft({ ...draft, notes: draft.notes.map((item) => (item.id === selectedNote.id ? { ...item, inkColor: hex } : item)) })} style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: hex, borderWidth: selectedNote.inkColor === hex ? 2 : 0, borderColor: theme.colors.accent }} />
+                <Pressable key={hex} accessibilityLabel="Note ink swatch" onPress={() => setDraft({ ...draft, notes: draft.notes.map((item) => (item.id === selectedNote.id ? { ...item, inkColor: hex } : item)) })} style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: hex, borderWidth: selectedNote.inkColor === hex ? 2 : 0, borderColor: theme.colors.accent }} />
               ))}
             </HorizontalStrip>
           ) : null}
@@ -657,6 +668,8 @@ function updateSticker(next: StickerPlacement) {
               return (
                 <Pressable
                   key={sticker.id}
+                  onPressIn={() => holdPage(true)}
+                  onPressOut={() => holdPage(false)}
                   onPress={() => {
                     if (!owned) {
                       if (plusPack || sticker.unlock === 'premium' || sticker.rarity === 'legendary') {
@@ -682,10 +695,15 @@ function updateSticker(next: StickerPlacement) {
                       rotation: Math.round(Math.random() * 20 - 10),
                       z: nextZ(),
                     };
+                    const scroller = (scrollRef.current?.getScrollableNode?.() ?? scrollRef.current) as { scrollTop?: number } | null;
+                    const kept = scroller?.scrollTop ?? 0;
                     setDraft({ ...draft, stickers: [...draft.stickers, placed] });
                     setSelectedId(placed.id);
+                    requestAnimationFrame(() => {
+                      if (scroller) scroller.scrollTop = kept;
+                    });
                   }}
-                  style={{ opacity: owned ? 1 : 0.45, alignItems: 'center', width: 74 }}
+                  style={{ opacity: owned ? 1 : 0.45, alignItems: 'center', width: 74, touchAction: 'pan-x' } as object}
                 >
                   <StickerView stickerId={sticker.id} size={64} />
                   <Text numberOfLines={1} style={{ color: theme.colors.inkSoft, fontSize: 10, fontFamily: theme.body }}>{owned ? sticker.name : plusPack || sticker.unlock !== 'coins' ? 'Plus' : `${sticker.price}🪙`}</Text>

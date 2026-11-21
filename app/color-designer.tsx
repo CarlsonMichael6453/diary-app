@@ -163,13 +163,13 @@ function ColorSlot({ label, value, selected, onPick }: { label: string; value: s
       </View>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
         {FREE_SWATCHES.map((hex) => (
-          <Pressable key={hex} accessibilityLabel={`${label} ${hex}`} onPress={() => onPick(hex)} style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: hex, borderWidth: value === hex ? 3 : 1, borderColor: value === hex ? theme.colors.ink : '#FFFFFF' }} />
+          <Pressable key={hex} accessibilityLabel={`${label} swatch`} onPress={() => onPick(hex)} style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: hex, borderWidth: value === hex ? 3 : 1, borderColor: value === hex ? theme.colors.ink : '#FFFFFF' }} />
         ))}
       </View>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
         {HUES.map((hue) => {
           const hex = hslToHex(hue, 62, 62);
-          return <Pressable key={hue} accessibilityLabel={`${label} hue ${hue}`} onPress={() => onPick(hex)} style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: hex, borderWidth: value.toLowerCase() === hex ? 3 : 0, borderColor: theme.colors.ink }} />;
+          return <Pressable key={hue} accessibilityLabel={`${label} shade`} onPress={() => onPick(hex)} style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: hex, borderWidth: value.toLowerCase() === hex ? 3 : 0, borderColor: theme.colors.ink }} />;
         })}
       </View>
       <Text style={{ color: theme.colors.ink, fontFamily: theme.body }}>Metallic for {label}</Text>

@@ -3,8 +3,20 @@ import { makeMutable } from 'react-native-reanimated';
 /** Set while a sticker, photo, or note is dragging so the page curl does not take that touch. */
 export const decorationDrag = makeMutable(0);
 
+let pageScroll: ((enabled: boolean) => void) | null = null;
+
+/** The open page registers this so a sticker, photo, note, tag, or mood press can hold the scroll. */
+export function bindPageScroll(fn: ((enabled: boolean) => void) | null) {
+  pageScroll = fn;
+}
+
+export function holdPage(held: boolean) {
+  pageScroll?.(!held);
+}
+
 export function holdDecoration(held: boolean) {
   decorationDrag.value = held ? 1 : 0;
+  holdPage(held);
 }
 
 /** Set while a finger is down on a horizontal strip (emojis, stickers, fonts, inks). */

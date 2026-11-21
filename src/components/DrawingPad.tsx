@@ -6,6 +6,18 @@ import { DRAW_COLORS, PEN_SIZES, padStrokes, pageStrokes, pencilCursorCss, strok
 import { isHexColor } from '../theme/designs';
 import { HorizontalStrip } from './HorizontalStrip';
 
+function hslHex(hue: number): string {
+  const saturation = 0.7;
+  const lightness = 0.52;
+  const chroma = (1 - Math.abs(2 * lightness - 1)) * saturation;
+  const hp = hue / 60;
+  const x = chroma * (1 - Math.abs((hp % 2) - 1));
+  const channel = hp < 1 ? [chroma, x, 0] : hp < 2 ? [x, chroma, 0] : hp < 3 ? [0, chroma, x] : hp < 4 ? [0, x, chroma] : hp < 5 ? [x, 0, chroma] : [chroma, 0, x];
+  const match = lightness - chroma / 2;
+  const hex = (value: number) => Math.round((value + match) * 255).toString(16).padStart(2, '0');
+  return `#${hex(channel[0])}${hex(channel[1])}${hex(channel[2])}`;
+}
+
 export function PencilIcon({ color, size = 32 }: { color: string; size?: number }) {
   const fill = isHexColor(color) ? color : '#3A2A32';
   return (
@@ -236,14 +248,13 @@ export function DrawingToolbar({
   onScroll: (scroll: boolean) => void;
   onDone: () => void;
 }) {
-  const [hex, setHex] = useState('');
   const ink = erase ? '#F4F1EA' : color;
   return (
     <View style={{ gap: 8 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <PencilIcon color={ink} />
-          <Text style={{ fontFamily: 'System', color: '#3A2A32' }}>{erase ? 'Eraser' : color}</Text>
+          <Text style={{ fontFamily: 'System', color: '#3A2A32' }}>{erase ? 'Eraser' : 'Pencil'}</Text>
         </View>
         <Pressable accessibilityLabel="Done drawing" onPress={onDone} style={{ backgroundColor: '#8C2F39', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10 }}>
           <Text style={{ color: '#FFFDF8', fontWeight: '700' }}>Done drawing</Text>
@@ -251,37 +262,24 @@ export function DrawingToolbar({
       </View>
       <HorizontalStrip contentContainerStyle={{ gap: 6, paddingVertical: 2 }}>
         {DRAW_COLORS.map((swatch) => (
-          <Pressable key={swatch} accessibilityLabel={`Pen ${swatch}`} onPress={() => { onErase(false); onColor(swatch); }} style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: swatch, borderWidth: !erase && color === swatch ? 3 : 1, borderColor: !erase && color === swatch ? '#111111' : '#FFFFFF' }} />
+          <Pressable key={swatch} accessibilityLabel={`Pen color ${DRAW_COLORS.indexOf(swatch) + 1}`} onPress={() => { onErase(false); onColor(swatch); }} style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: swatch, borderWidth: !erase && color === swatch ? 3 : 1, borderColor: !erase && color === swatch ? '#111111' : '#FFFFFF' }} />
         ))}
       </HorizontalStrip>
       {recent.length > 0 ? (
         <HorizontalStrip contentContainerStyle={{ gap: 6 }}>
           {recent.map((swatch) => (
-            <Pressable key={swatch} accessibilityLabel={`Recent ${swatch}`} onPress={() => { onErase(false); onColor(swatch); }} style={{ width: 22, height: 22, borderRadius: 6, backgroundColor: swatch, borderWidth: 1, borderColor: '#FFFFFF' }} />
+            <Pressable key={swatch} accessibilityLabel="Recent color" onPress={() => { onErase(false); onColor(swatch); }} style={{ width: 22, height: 22, borderRadius: 6, backgroundColor: swatch, borderWidth: 1, borderColor: '#FFFFFF' }} />
           ))}
         </HorizontalStrip>
       ) : null}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <TextInput
-          value={hex}
-          onChangeText={setHex}
-          autoCapitalize="none"
-          placeholder="#2E86FF"
-          accessibilityLabel="Custom pen color"
-          style={{ backgroundColor: '#FFFDF8', color: '#1A1420', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, minWidth: 110 }}
-        />
-        <Pressable
-          accessibilityLabel="Use custom color"
-          onPress={() => {
-            const next = hex.trim().startsWith('#') ? hex.trim() : `#${hex.trim()}`;
-            if (!isHexColor(next)) return;
-            onErase(false);
-            onColor(next);
-          }}
-          style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: '#F7F1E8' }}
-        >
-          <Text>Use color</Text>
-        </Pressable>
+        <View style={{ flexDirection: 'row', height: 28, borderRadius: 8, overflow: 'hidden' }}>
+          {Array.from({ length: 12 }, (_, index) => {
+            const hue = index * 30;
+            const swatch = `hsl(${hue} 70% 52%)`;
+            return <Pressable key={hue} accessibilityLabel={`Custom hue ${hue}`} onPress={() => { onErase(false); onColor(hslHex(hue)); }} style={{ width: 22, backgroundColor: swatch }} />;
+          })}
+        </View>
         {PEN_SIZES.map((pen) => (
           <Pressable key={pen} accessibilityLabel={`Brush ${pen}`} onPress={() => onSize(pen)} style={{ width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: size === pen && !erase ? '#3A2A32' : '#F7F1E8' }}>
             <View style={{ width: pen + 4, height: pen + 4, borderRadius: pen, backgroundColor: size === pen && !erase ? '#FFFDF8' : '#3A2A32' }} />

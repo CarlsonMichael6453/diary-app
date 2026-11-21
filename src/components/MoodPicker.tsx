@@ -3,6 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 import { MOODS, type MoodId } from '../data/moods';
 import { playMoodSound } from '../services/sounds';
 import { useTheme } from '../theme/BookTheme';
+import { holdPage } from '../logic/pageGesture';
 import { HorizontalStrip } from './HorizontalStrip';
 
 export function MoodPicker({ value, onChange }: { value: MoodId; onChange: (mood: MoodId) => void }) {
@@ -15,11 +16,14 @@ export function MoodPicker({ value, onChange }: { value: MoodId; onChange: (mood
           <Pressable
             key={mood.id}
             accessibilityLabel={mood.label}
+            onPressIn={() => holdPage(true)}
+            onPressOut={() => holdPage(false)}
             onPress={() => {
               if (mood.id !== value) playMoodSound(mood.id);
               onChange(mood.id);
             }}
             style={{
+              touchAction: 'pan-x',
               alignItems: 'center',
               paddingHorizontal: 10,
               paddingVertical: 6,

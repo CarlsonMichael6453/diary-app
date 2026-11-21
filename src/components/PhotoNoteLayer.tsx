@@ -125,7 +125,7 @@ function PlacedBox({
       ref={(node) => {
         (node as { setAttribute?: (name: string, value: string) => void } | null)?.setAttribute?.('data-decoration', '1');
       }}
-      style={{ position: 'absolute', left: x * pageWidth - size / 2, top: y * pageHeight - size / 2, width: size, transform: [{ rotate: `${rotation}deg` }], zIndex }}
+      style={{ position: 'absolute', left: x * pageWidth - size / 2, top: y * pageHeight - size / 2, width: size, transform: [{ rotate: `${rotation}deg` }], zIndex, touchAction: 'none' } as object}
     >
       {children}
       {selected ? <View {...scalePan.panHandlers} style={styles.knob} /> : null}

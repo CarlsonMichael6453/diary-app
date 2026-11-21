@@ -4,6 +4,7 @@ import { Pressable, Text, TextInput, View } from 'react-native';
 import { TEMPLATES } from '../logic/templates';
 import { capturePlace } from '../services/place';
 import { useDiary } from '../store/useDiary';
+import { holdPage } from '../logic/pageGesture';
 import { useTheme } from '../theme/BookTheme';
 import { VoiceNote } from './VoiceNote';
 import { Button, FieldLabel } from './ui';
@@ -60,22 +61,22 @@ export function EntryExtras({
       {isNew && !draft.body ? (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {TEMPLATES.map((template) => (
-            <Pressable key={template.id} onPress={() => onChange({ templateId: template.id, title: template.title || draft.title, body: template.body })} style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: theme.colors.chip }}>
+            <Pressable key={template.id} onPressIn={() => holdPage(true)} onPressOut={() => holdPage(false)} onPress={() => onChange({ templateId: template.id, title: template.title || draft.title, body: template.body })} style={{ touchAction: 'none', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: theme.colors.chip } as object}>
               <Text style={{ color: theme.colors.chipInk, fontFamily: theme.body }}>{template.name}</Text>
             </Pressable>
           ))}
         </View>
       ) : null}
       <FieldLabel>Tags</FieldLabel>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+      <View onTouchStart={() => holdPage(true)} onTouchEnd={() => holdPage(false)} style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, touchAction: 'none' } as object}>
         {(draft.tags ?? []).map((item) => (
           <Text key={item} style={{ color: theme.colors.ink, fontFamily: theme.body }}>{item}</Text>
         ))}
       </View>
-      <TextInput value={tag} onChangeText={setTag} placeholder="Add a tag" placeholderTextColor={theme.colors.inkSoft} onSubmitEditing={() => { if (!tag.trim()) return; onChange({ tags: [...(draft.tags ?? []), tag.trim()] }); setTag(''); }} style={{ backgroundColor: theme.colors.card, color: theme.colors.ink, borderRadius: 12, padding: 8, fontFamily: theme.body }} />
+      <TextInput value={tag} onChangeText={setTag} placeholder="Add a tag" placeholderTextColor={theme.colors.inkSoft} onFocus={() => holdPage(true)} onBlur={() => holdPage(false)} onSubmitEditing={() => { if (!tag.trim()) return; onChange({ tags: [...(draft.tags ?? []), tag.trim()] }); setTag(''); }} style={{ backgroundColor: theme.colors.card, color: theme.colors.ink, borderRadius: 12, padding: 8, fontFamily: theme.body, touchAction: 'none' } as object} />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
         {ACTIVITIES.map((activity) => (
-          <Pressable key={activity} onPress={() => toggleActivity(activity)} style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: (draft.activities ?? []).includes(activity) ? theme.colors.accent : theme.colors.chip }}>
+          <Pressable key={activity} onPressIn={() => holdPage(true)} onPressOut={() => holdPage(false)} onPress={() => toggleActivity(activity)} style={{ touchAction: 'none', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: (draft.activities ?? []).includes(activity) ? theme.colors.accent : theme.colors.chip } as object}>
             <Text style={{ color: (draft.activities ?? []).includes(activity) ? theme.colors.onAccent : theme.colors.chipInk, fontFamily: theme.body }}>{activity}</Text>
           </Pressable>
         ))}

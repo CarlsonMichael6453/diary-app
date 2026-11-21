@@ -17,6 +17,7 @@ import { Paper } from '@/src/components/Paper';
 import { Screen } from '@/src/components/Screen';
 import { StickerLayer } from '@/src/components/StickerLayer';
 import { ReviewPrompt, useReviewMoment } from '@/src/components/ReviewPrompt';
+import { DeepWritingButton, FadeChrome } from '@/src/components/FadeChrome';
 import { Button, Confirm } from '@/src/components/ui';
 import { type MoodId } from '@/src/data/moods';
 import { promptForDate } from '@/src/data/prompts';
@@ -164,6 +165,8 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
   const upsertEntry = useDiary((state) => state.upsertEntry);
   const deleteEntry = useDiary((state) => state.deleteEntry);
   const buySticker = useDiary((state) => state.buySticker);
+  const patchSettings = useDiary((state) => state.patchSettings);
+  const deep = settings.deepWriting === true;
   const [decorate, setDecorate] = useState(false);
   const [packId, setPackId] = useState(PACKS[0].id);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -186,6 +189,16 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
     holdDrawing(drawingMode);
     return () => holdDrawing(false);
   }, [drawingMode]);
+
+  function setDeep(next: boolean) {
+    if (next) {
+      setDrawingMode(false);
+      setDrawScroll(false);
+      setDecorate(false);
+      setShowThemes(false);
+    }
+    patchSettings({ deepWriting: next });
+  }
 
   useEffect(() => {
     bindPageScroll((enabled) => {
@@ -401,11 +414,16 @@ function updateSticker(next: StickerPlacement) {
 
   return (
     <Screen nav={false} scroll={false} padded={false} style={{ flex: 1, paddingTop: insets.top }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingBottom: 8, zIndex: 200 }}>
-        <Pressable onPress={goBack} accessibilityLabel="Back"><Text style={{ color: theme.colors.ink, fontFamily: theme.body, fontSize: 16 }}>‹ Back</Text></Pressable>
-        <Pressable onPress={() => router.navigate('/')} accessibilityLabel="Home"><Text style={{ color: theme.colors.ink, fontFamily: theme.body, fontSize: 16 }}>Home</Text></Pressable>
-        <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>{toast || (saved ? 'On this device' : 'Not saved yet')}</Text>
-        <Pressable onPress={() => setConfirmDelete(true)}><Text style={{ color: theme.colors.danger, fontFamily: theme.body }}>Delete</Text></Pressable>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingHorizontal: 12, paddingBottom: 8, zIndex: 220 }}>
+        <FadeChrome hidden={deep} style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Pressable onPress={goBack} accessibilityLabel="Back"><Text style={{ color: theme.colors.ink, fontFamily: theme.body, fontSize: 16 }}>‹ Back</Text></Pressable>
+            <Pressable onPress={() => router.navigate('/')} accessibilityLabel="Home"><Text style={{ color: theme.colors.ink, fontFamily: theme.body, fontSize: 16 }}>Home</Text></Pressable>
+            <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>{toast || (saved ? 'On this device' : 'Not saved yet')}</Text>
+            <Pressable onPress={() => setConfirmDelete(true)}><Text style={{ color: theme.colors.danger, fontFamily: theme.body }}>Delete</Text></Pressable>
+          </View>
+        </FadeChrome>
+        <DeepWritingButton on={deep} onPress={() => setDeep(!deep)} />
       </View>
       <ScrollView
         ref={scrollRef as never}
@@ -440,8 +458,10 @@ function updateSticker(next: StickerPlacement) {
                 <Pressable accessibilityLabel="Next page" onPress={() => turnPage(1)}><Text style={{ color: theme.colors.paperInk, fontSize: 20 }}>›</Text></Pressable>
               </View>
               <Text style={{ color: theme.colors.paperInk, fontFamily: theme.script, fontSize: 22, marginTop: 8 }}>{prompt}</Text>
-              <MoodPicker value={draft.mood} onChange={(mood) => setDraft({ ...draft, mood })} />
-              <EntryExtras isNew={!saved} draft={draft} onChange={(patch) => setDraft({ ...draft, ...patch })} onDraw={() => { setDrawingMode(true); setDrawScroll(false); }} />
+              <FadeChrome hidden={deep}>
+                <MoodPicker value={draft.mood} onChange={(mood) => setDraft({ ...draft, mood })} />
+                <EntryExtras isNew={!saved} draft={draft} onChange={(patch) => setDraft({ ...draft, ...patch })} onDraw={() => { setDrawingMode(true); setDrawScroll(false); }} />
+              </FadeChrome>
               <LegacyDrawing value={draft.drawing} paper={theme.colors.paper} />
               {draft.photoOnly ? <Text style={{ color: theme.colors.paperSoft, fontFamily: theme.body, marginTop: 12 }}>Photo page</Text> : null}
             </View>
@@ -496,8 +516,8 @@ function updateSticker(next: StickerPlacement) {
               decorate={decorate}
             />
             {buddy ? (
-              <View
-                pointerEvents="box-none"
+              <FadeChrome
+                hidden={deep}
                 style={[
                   { zIndex: 180 },
                   perch === 'tr'
@@ -525,7 +545,7 @@ function updateSticker(next: StickerPlacement) {
                   size={118}
                   taps
                 />
-              </View>
+              </FadeChrome>
             ) : null}
             <DrawingSurface
               value={draft.drawing}
@@ -540,6 +560,7 @@ function updateSticker(next: StickerPlacement) {
         </View>
         </PageFlip>
         {showThemes ? (
+          <FadeChrome hidden={deep}>
           <View style={{ paddingVertical: 8, gap: 8 }}>
             <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 22 }}>Page theme</Text>
             <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>
@@ -570,9 +591,11 @@ function updateSticker(next: StickerPlacement) {
               ))}
             </HorizontalStrip>
           </View>
+          </FadeChrome>
         ) : null}
       </ScrollView>
 
+      <FadeChrome hidden={deep}>
       {decorate ? (
         <View style={{ maxHeight: '28%', backgroundColor: theme.colors.card, borderTopWidth: 1, borderTopColor: theme.colors.paperEdge, paddingHorizontal: 10, paddingTop: 6, paddingBottom: Math.max(insets.bottom, 8), zIndex: 200 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -735,6 +758,7 @@ function updateSticker(next: StickerPlacement) {
           <Button label="Pal" tone="ghost" onPress={() => router.push('/buddies' as Href)} />
         </View>
       )}
+      </FadeChrome>
       {confirmDelete ? (
         <Confirm
           title="Delete this page?"

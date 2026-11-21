@@ -119,6 +119,7 @@ export function defaultSettings(): Settings {
     seasonAnnounced: [],
     fontId: null,
     inkColor: null,
+    deepWriting: false,
   };
 }
 

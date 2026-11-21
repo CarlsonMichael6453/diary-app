@@ -8,6 +8,8 @@ export const FEEDBACK_EMAIL = 'bykeh1sy@mail.grokbot.com';
 const FEEDBACK_EMAIL_PLACEHOLDER = 'feedback@example.com';
 
 export const REVIEW_MIN_WRITING_STREAK = 3;
+/** Real saved pages required before any store-review prompt. */
+export const REVIEW_MIN_SAVED_ENTRIES = 5;
 export const REVIEW_COOLDOWN_DAYS = 90;
 export const REVIEW_COOLDOWN_MS = REVIEW_COOLDOWN_DAYS * 24 * 60 * 60 * 1000;
 export const REVIEW_MAX_PROMPTS = 3;

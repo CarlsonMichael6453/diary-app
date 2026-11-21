@@ -7,6 +7,7 @@ import { ReviewPrompt, useReviewMoment } from '@/src/components/ReviewPrompt';
 import { Screen } from '@/src/components/Screen';
 import { todayKey } from '@/src/logic/dates';
 import { rewardPoolFor } from '@/src/logic/packs';
+import { countReviewEntries } from '@/src/logic/review';
 import { resolveReward, rewardForCatch, type ResolvedReward } from '@/src/logic/rewards';
 import { birthdayFrom } from '@/src/logic/seasons';
 import { uid } from '@/src/logic/id';
@@ -50,7 +51,7 @@ export default function CatchScreen() {
     grantReward(resolved, allowDrop ? 'catch' : undefined);
     setReward(resolved);
     setRunning(false);
-    if (scoreRef.current > 0) void review.consider('game-won');
+    if (scoreRef.current > 0) void review.consider('game-won', undefined, countReviewEntries(useDiary.getState().entries));
   }
 
   useEffect(() => {

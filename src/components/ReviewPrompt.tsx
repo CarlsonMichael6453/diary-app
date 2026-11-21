@@ -19,9 +19,9 @@ export function useReviewMoment() {
     };
   }, []);
 
-  const consider = useCallback(async (moment: ReviewMoment, writingStreak?: number) => {
+  const consider = useCallback(async (moment: ReviewMoment, writingStreak?: number, savedEntryCount?: number) => {
     if (visibleRef.current) return;
-    const show = await offerReview(moment, writingStreak);
+    const show = await offerReview(moment, writingStreak, savedEntryCount);
     if (show && mounted.current) {
       visibleRef.current = true;
       setVisible(true);

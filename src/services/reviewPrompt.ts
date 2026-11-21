@@ -21,17 +21,17 @@ async function saveReviewRecord(record: ReviewRecord): Promise<void> {
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
 }
 
-async function offerReviewOnce(moment: ReviewMoment, writingStreak: number | undefined, now: number): Promise<boolean> {
+async function offerReviewOnce(moment: ReviewMoment, writingStreak: number | undefined, savedEntryCount: number | undefined, now: number): Promise<boolean> {
   const record = await loadReviewRecord();
-  const outcome = decideReview({ record, now, moment, writingStreak });
+  const outcome = decideReview({ record, now, moment, writingStreak, savedEntryCount });
   if (!outcome.decision.ask) return false;
   await saveReviewRecord(outcome.next);
   return true;
 }
 
 /** Resolves true only when a prompt should be shown. Calls are serialized so two saves cannot double-count. */
-export function offerReview(moment: ReviewMoment, writingStreak?: number, now = Date.now()): Promise<boolean> {
-  const run = tail.then(() => offerReviewOnce(moment, writingStreak, now));
+export function offerReview(moment: ReviewMoment, writingStreak?: number, savedEntryCount = 0, now = Date.now()): Promise<boolean> {
+  const run = tail.then(() => offerReviewOnce(moment, writingStreak, savedEntryCount, now));
   tail = run.then(
     () => undefined,
     () => undefined,

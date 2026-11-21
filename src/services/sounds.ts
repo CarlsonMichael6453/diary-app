@@ -151,6 +151,7 @@ const moodSources: Record<MoodId, number> = {
   tired: require('../../assets/sounds/moods/tired.wav'),
   loved: require('../../assets/sounds/moods/loved.wav'),
   hopeful: require('../../assets/sounds/moods/hopeful.wav'),
+  fired: require('../../assets/sounds/moods/fired.wav'),
 };
 
 export function playMoodSound(moodId: MoodId): void {

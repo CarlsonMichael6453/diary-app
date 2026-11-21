@@ -9,6 +9,7 @@ export const MOODS = [
   { id: 'tired', emoji: '😴', label: 'Tired', color: '#9AA0B4' },
   { id: 'loved', emoji: '💗', label: 'Loved', color: '#FF6B9A' },
   { id: 'hopeful', emoji: '🌱', label: 'Hopeful', color: '#7DCE82' },
+  { id: 'fired', emoji: '🔥', label: 'Fired up', color: '#FF5A36' },
 ] as const;
 
 export type MoodId = (typeof MOODS)[number]['id'];

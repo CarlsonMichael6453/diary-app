@@ -122,6 +122,7 @@ const moods = {
   tired: tone(392, 0.7, { amp: 0.12, slide: -180, attack: 0.08, release: 0.22 }),
   grateful: concat([tone(523, 0.2, { amp: 0.16, release: 0.1 }), tone(659, 0.28, { amp: 0.14, release: 0.16 })]),
   hopeful: concat([tone(392, 0.18, { amp: 0.14 }), tone(587, 0.32, { amp: 0.16, slide: 20, release: 0.16 })]),
+  fired: concat([tone(220, 0.06, { amp: 0.2, partial: 0.3 }), tone(440, 0.08, { amp: 0.18 }), tone(880, 0.14, { amp: 0.16, slide: 40, release: 0.08 })]),
 };
 
 for (const [id, samples] of Object.entries(moods)) {

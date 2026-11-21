@@ -6,6 +6,7 @@ export const MOOD_SCORE: Record<string, number> = {
   grateful: 4,
   hopeful: 4,
   excited: 4,
+  fired: 5,
   calm: 3,
   tired: 2,
   anxious: 2,

@@ -4,7 +4,7 @@ export function healthMoodNotes(days: HealthDay[]): string[] {
   const withSteps = days.filter((day) => typeof day.steps === 'number' && day.mood);
   const withSleep = days.filter((day) => typeof day.sleepHours === 'number' && day.mood);
   const notes: string[] = [];
-  const score = (mood: string) => ({ happy: 5, loved: 5, grateful: 4, hopeful: 4, excited: 4, calm: 3, tired: 2, anxious: 2, sad: 1, angry: 1 }[mood] ?? 3);
+  const score = (mood: string) => ({ happy: 5, loved: 5, grateful: 4, hopeful: 4, excited: 4, fired: 5, calm: 3, tired: 2, anxious: 2, sad: 1, angry: 1 }[mood] ?? 3);
   if (withSteps.length >= 4) {
     const sorted = [...withSteps].sort((a, b) => (a.steps ?? 0) - (b.steps ?? 0));
     const mid = Math.floor(sorted.length / 2);

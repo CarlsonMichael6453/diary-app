@@ -174,7 +174,7 @@ export default function SettingsScreen() {
       </View>
 
       <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 26, marginTop: 18 }}>Lock</Text>
-      <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, marginBottom: 8 }}>A four-digit passcode. Face ID and fingerprint work in the phone app. On the web, the cover opens with the passcode, or with a tap if you have not set one.</Text>
+      <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, marginBottom: 8 }}>Your diary is stored privately on this device. A four-digit passcode. Face ID and fingerprint work in the phone app. On the web, the cover opens with the passcode, or with a tap if you have not set one.</Text>
       <View style={{ marginBottom: 8 }}>
         <Button
           label={settings.lockOnOpen ? 'Lock diary on open' : 'Cover only, then it opens'}

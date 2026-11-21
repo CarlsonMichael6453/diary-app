@@ -10,11 +10,17 @@ export function IconButton({
   onPress,
   children,
   style,
+  small,
+  onPressIn,
+  onPressOut,
 }: {
   label: string;
   onPress: () => void;
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
+  small?: boolean;
+  onPressIn?: () => void;
+  onPressOut?: () => void;
 }) {
   const theme = useTheme();
   const [tip, setTip] = useState(false);
@@ -29,11 +35,15 @@ export function IconButton({
         accessibilityRole="button"
         accessibilityLabel={label}
         onPress={onPress}
+        onPressIn={onPressIn}
         onLongPress={() => setTip(true)}
         onHoverIn={() => setTip(true)}
         onHoverOut={() => setTip(false)}
-        onPressOut={() => setTimeout(() => setTip(false), 700)}
-        style={{ width: 46, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.paperEdge, backgroundColor: theme.colors.card }}
+        onPressOut={() => {
+          onPressOut?.();
+          setTimeout(() => setTip(false), 700);
+        }}
+        style={{ width: small ? 32 : 46, height: small ? 32 : 44, borderRadius: small ? 10 : 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.paperEdge, backgroundColor: theme.colors.card }}
       >
         {children}
       </Pressable>
@@ -55,6 +65,31 @@ export function DeviceLock({ saved }: { saved: boolean }) {
         </View>
       ) : null}
     </View>
+  );
+}
+
+export function ShuffleIcon({ color }: { color: string }) {
+  return (
+    <Svg width={16} height={16} viewBox="0 0 16 16">
+      <Path d="M2 4 H6 L10 12 H14 M14 4 H10 L6 12 H2" stroke={color} strokeWidth={1.4} fill="none" strokeLinecap="round" />
+      <Path d="M12 2 L14 4 L12 6 M12 10 L14 12 L12 14" stroke={color} strokeWidth={1.4} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function CloseIcon({ color }: { color: string }) {
+  return (
+    <Svg width={12} height={12} viewBox="0 0 12 12">
+      <Path d="M2 2 L10 10 M10 2 L2 10" stroke={color} strokeWidth={1.6} fill="none" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+export function PromptIcon({ color }: { color: string }) {
+  return (
+    <Svg width={14} height={14} viewBox="0 0 14 14">
+      <Path d="M3 3 H11 V9 H7 L4 12 V9 H3 Z" stroke={color} strokeWidth={1.3} fill="none" strokeLinejoin="round" />
+    </Svg>
   );
 }
 

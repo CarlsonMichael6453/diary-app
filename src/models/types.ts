@@ -74,6 +74,9 @@ export type DiaryEntry = {
   templateId?: string | null;
   voiceNote?: string | null;
   drawing?: string | null;
+  /** A prompt chosen for this page. Empty means the question for the date. */
+  prompt?: string | null;
+  promptHidden?: boolean;
   placeLabel?: string | null;
   weather?: string | null;
 };
@@ -121,6 +124,8 @@ export type Settings = {
   deepWriting: boolean;
   /** Tags created in the diary, so they stay in the menu after a page lets one go. */
   savedTags: string[];
+  /** Show a writing question at the top of each page. */
+  writingPrompts: boolean;
 };
 
 export type Wallet = {

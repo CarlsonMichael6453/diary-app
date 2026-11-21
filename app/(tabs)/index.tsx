@@ -140,8 +140,12 @@ export default function DiaryHome() {
         <Paper>
           <View style={{ padding: 18, paddingLeft: 28, gap: 8 }}>
             <Text style={{ color: theme.colors.paperSoft, fontFamily: theme.body }}>{formatPretty(today)}</Text>
-            <Text style={{ color: theme.colors.paperInk, fontFamily: theme.script, fontSize: 28 }}>Today’s prompt</Text>
-            <Text style={{ color: theme.colors.paperInk, fontFamily: theme.body, fontSize: 16, lineHeight: 24 }}>{prompt}</Text>
+            {settings.writingPrompts !== false ? (
+              <>
+                <Text style={{ color: theme.colors.paperInk, fontFamily: theme.script, fontSize: 28 }}>Today’s prompt</Text>
+                <Text style={{ color: theme.colors.paperInk, fontFamily: theme.body, fontSize: 16, lineHeight: 24 }}>{prompt}</Text>
+              </>
+            ) : null}
             <Text style={{ color: theme.colors.accent, fontFamily: theme.body, marginTop: 6 }}>{wroteToday ? 'Write another page' : 'Open today’s page'}</Text>
           </View>
         </Paper>

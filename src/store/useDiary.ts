@@ -121,6 +121,7 @@ export function defaultSettings(): Settings {
     inkColor: null,
     deepWriting: false,
     savedTags: [],
+    writingPrompts: true,
   };
 }
 

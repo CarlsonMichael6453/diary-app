@@ -2,6 +2,7 @@ import { memo, useState } from 'react';
 import { Image, Text, View } from 'react-native';
 
 import { promptForDate } from '../data/prompts';
+import { useDiary } from '../store/useDiary';
 import { formatLong } from '../logic/dates';
 import type { DiaryBook, DiaryEntry } from '../models/types';
 import { getMood } from '../data/moods';
@@ -54,11 +55,12 @@ export const NeighborPage = memo(function NeighborPage({ entry, book, premium }:
 
 export function BlankSheet({ date }: { date: string }) {
   const theme = useTheme();
+  const promptsOn = useDiary((state) => state.settings.writingPrompts !== false);
   return (
     <Paper style={{ minHeight: 640 }}>
       <View style={{ minHeight: 640, padding: 28 }}>
         <Text style={{ color: theme.colors.paperSoft, fontFamily: theme.body }}>{formatLong(date)}</Text>
-        <Text style={{ color: theme.colors.paperInk, fontFamily: theme.script, fontSize: 22, marginTop: 16 }}>{promptForDate(date)}</Text>
+        {promptsOn ? <Text style={{ color: theme.colors.paperInk, fontFamily: theme.script, fontSize: 22, marginTop: 16 }}>{promptForDate(date)}</Text> : null}
       </View>
     </Paper>
   );

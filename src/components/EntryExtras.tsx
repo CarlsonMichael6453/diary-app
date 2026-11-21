@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
-import { tagSummary } from '../logic/tags';
+import { cleanTag, mergeTagCatalog, selectCreatedTag, tagSummary, toggleTag } from '../logic/tags';
 import { TEMPLATES } from '../logic/templates';
 import { capturePlace } from '../services/place';
 import { useDiary } from '../store/useDiary';
@@ -21,39 +21,72 @@ export function TagMenu({
   onChange: (patch: { tags?: string[]; activities?: string[] }) => void;
 }) {
   const theme = useTheme();
+  const entries = useDiary((state) => state.entries);
+  const savedTags = useDiary((state) => state.settings.savedTags ?? []);
+  const patchSettings = useDiary((state) => state.patchSettings);
   const [open, setOpen] = useState(false);
   const [tag, setTag] = useState('');
   const chosen = activities ?? [];
+  const selected = tags ?? [];
+  const catalog = useMemo(() => mergeTagCatalog(savedTags, [...entries, { tags: selected }]), [savedTags, entries, selected]);
+
+  function createTag() {
+    const next = selectCreatedTag(selected, catalog, tag);
+    if (!cleanTag(tag)) return;
+    onChange({ tags: next.tags });
+    patchSettings({ savedTags: next.catalog });
+    setTag('');
+    const name = next.tags[next.tags.length - 1];
+    if (typeof document === 'undefined' || !name) return;
+    requestAnimationFrame(() => {
+      const item = document.querySelector(`[data-tag-name="${CSS.escape(name)}"]`);
+      const list = item?.closest('[data-choice-list="1"]') as HTMLElement | null;
+      if (!item || !list) return;
+      const itemRect = item.getBoundingClientRect();
+      const listRect = list.getBoundingClientRect();
+      list.scrollTop += itemRect.top - listRect.top - 8;
+    });
+  }
+
   return (
     <ChoiceMenu label="Tags" open={open} onToggle={() => setOpen((shown) => !shown)} summary={<Text numberOfLines={1} style={{ color: theme.colors.paperInk, fontFamily: theme.body }}>{tagSummary(tags, activities)}</Text>}>
       <View style={{ padding: 8, gap: 8 }}>
         {ACTIVITIES.map((activity) => {
-          const selected = chosen.includes(activity);
+          const on = chosen.includes(activity);
           return (
             <Pressable
               key={activity}
               accessibilityLabel={activity}
-              onPress={() => onChange({ activities: selected ? chosen.filter((item) => item !== activity) : [...chosen, activity] })}
-              style={{ paddingHorizontal: 10, paddingVertical: 8, borderRadius: 999, backgroundColor: selected ? theme.colors.accent : theme.colors.chip, alignSelf: 'flex-start' }}
+              accessibilityState={{ checked: on }}
+              onPress={() => onChange({ activities: on ? chosen.filter((item) => item !== activity) : [...chosen, activity] })}
+              style={{ paddingHorizontal: 10, paddingVertical: 8, borderRadius: 999, backgroundColor: on ? theme.colors.accent : theme.colors.chip, alignSelf: 'flex-start' }}
             >
-              <Text style={{ color: selected ? theme.colors.onAccent : theme.colors.chipInk, fontFamily: theme.body }}>{activity}</Text>
+              <Text style={{ color: on ? theme.colors.onAccent : theme.colors.chipInk, fontFamily: theme.body }}>{on ? '✓ ' : ''}{activity}</Text>
             </Pressable>
           );
         })}
-        {(tags ?? []).map((item) => (
-          <Text key={item} style={{ color: theme.colors.ink, fontFamily: theme.body, paddingHorizontal: 4 }}>{item}</Text>
-        ))}
+        {catalog.map((item) => {
+          const on = selected.some((value) => value.toLowerCase() === item.toLowerCase());
+          return (
+            <Pressable
+              key={item}
+              accessibilityRole="checkbox"
+              accessibilityLabel={`Tag ${item}`}
+              accessibilityState={{ checked: on }}
+              {...({ dataSet: { tagName: item } } as object)}
+              onPress={() => onChange({ tags: toggleTag(selected, item) })}
+              style={{ paddingHorizontal: 10, paddingVertical: 8, borderRadius: 999, backgroundColor: on ? theme.colors.accent : theme.colors.chip, alignSelf: 'flex-start' }}
+            >
+              <Text style={{ color: on ? theme.colors.onAccent : theme.colors.chipInk, fontFamily: theme.body }}>{on ? '✓ ' : ''}{item}</Text>
+            </Pressable>
+          );
+        })}
         <TextInput
           value={tag}
           onChangeText={setTag}
           placeholder="Add a tag"
           placeholderTextColor={theme.colors.inkSoft}
-          onSubmitEditing={() => {
-            const next = tag.trim();
-            if (!next || (tags ?? []).includes(next)) return;
-            onChange({ tags: [...(tags ?? []), next] });
-            setTag('');
-          }}
+          onSubmitEditing={createTag}
           style={{ backgroundColor: theme.colors.bg, color: theme.colors.ink, borderRadius: 10, padding: 8, fontFamily: theme.body }}
         />
       </View>

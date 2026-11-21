@@ -119,6 +119,8 @@ export type Settings = {
   inkColor: string | null;
   /** Hide the buttons and the pal so a page is only for writing. */
   deepWriting: boolean;
+  /** Tags created in the diary, so they stay in the menu after a page lets one go. */
+  savedTags: string[];
 };
 
 export type Wallet = {

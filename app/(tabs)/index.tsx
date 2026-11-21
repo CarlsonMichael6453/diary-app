@@ -7,6 +7,7 @@ import { getBuddy } from '@/src/buddies/catalog';
 import { Paper } from '@/src/components/Paper';
 import { Screen } from '@/src/components/Screen';
 import { CoinPill } from '@/src/components/ui';
+import { VoiceMark } from '@/src/components/VoiceChip';
 import { getMood } from '@/src/data/moods';
 import { promptForDate } from '@/src/data/prompts';
 import { formatPretty, todayKey } from '@/src/logic/dates';
@@ -150,7 +151,7 @@ export default function DiaryHome() {
         <View style={{ marginTop: 18, gap: 10 }}>
           <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 24 }}>Written today</Text>
           {todayEntries.map((entry) => (
-            <EntryRow key={entry.id} id={entry.id} title={entry.title} body={entry.body} mood={entry.mood} date={entry.date} />
+            <EntryRow key={entry.id} id={entry.id} title={entry.title} body={entry.body} mood={entry.mood} date={entry.date} voice={Boolean(entry.voiceNote)} />
           ))}
         </View>
       ) : null}
@@ -161,7 +162,7 @@ export default function DiaryHome() {
           <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>Nothing earlier yet. The book starts whenever you do.</Text>
         ) : (
           earlier.map((entry) => (
-            <EntryRow key={entry.id} id={entry.id} title={entry.title} body={entry.body} mood={entry.mood} date={entry.date} />
+            <EntryRow key={entry.id} id={entry.id} title={entry.title} body={entry.body} mood={entry.mood} date={entry.date} voice={Boolean(entry.voiceNote)} />
           ))
         )}
       </View>
@@ -169,13 +170,13 @@ export default function DiaryHome() {
   );
 }
 
-function EntryRow({ id, title, body, mood, date }: { id: string; title: string; body: string; mood: string; date: string }) {
+function EntryRow({ id, title, body, mood, date, voice }: { id: string; title: string; body: string; mood: string; date: string; voice?: boolean }) {
   const theme = useTheme();
   const moodInfo = getMood(mood as 'calm');
   return (
     <Pressable onPress={() => router.push(`/entry/${id}` as Href)}>
       <View style={{ backgroundColor: theme.colors.card, borderRadius: theme.radius, padding: 14, borderLeftWidth: 6, borderLeftColor: moodInfo.color }}>
-        <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, fontSize: 12 }}>{formatPretty(date)} · {moodInfo.emoji} {moodInfo.label}</Text>
+        <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, fontSize: 12 }}>{formatPretty(date)} · {moodInfo.emoji} {moodInfo.label}{voice ? ' · ' : ''}{voice ? <VoiceMark /> : null}</Text>
         <Text style={{ color: theme.colors.ink, fontFamily: theme.script, fontSize: 24 }} numberOfLines={1}>{title || 'Untitled page'}</Text>
         <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }} numberOfLines={2}>{body}</Text>
       </View>

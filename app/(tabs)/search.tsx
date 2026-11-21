@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
 import { Highlight } from '@/src/components/Highlight';
+import { VoiceMark } from '@/src/components/VoiceChip';
 import { Screen } from '@/src/components/Screen';
 import { getMood } from '@/src/data/moods';
 import { formatPretty } from '@/src/logic/dates';
@@ -68,7 +69,7 @@ export default function SearchScreen() {
             const hay = `${entry.title} ${entry.body}`;
             return (
               <Pressable key={entry.id} onPress={() => router.push(`/entry/${entry.id}` as Href)} style={{ backgroundColor: theme.colors.card, borderRadius: theme.radius, padding: 14, borderLeftWidth: 6, borderLeftColor: mood.color }}>
-                <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, fontSize: 12 }}>{formatPretty(entry.date)} · {mood.emoji}</Text>
+                <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, fontSize: 12 }}>{formatPretty(entry.date)} · {mood.emoji}{entry.voiceNote ? ' ' : ''}{entry.voiceNote ? <VoiceMark /> : null}</Text>
                 <Highlight text={entry.title || 'Untitled page'} query={query} style={{ color: theme.colors.ink, fontFamily: theme.script, fontSize: 24 }} />
                 <Highlight text={snippetAround(hay, query)} query={query} style={{ color: theme.colors.inkSoft, fontFamily: theme.body, marginTop: 4 }} />
               </Pressable>

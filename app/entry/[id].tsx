@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BuddyView } from '@/src/buddies/BuddyView';
 import { getBuddy } from '@/src/buddies/catalog';
 import { DrawingSurface, DrawingToolbar, LegacyDrawing, PencilIcon } from '@/src/components/DrawingPad';
+import { VoicePlayer } from '@/src/components/VoicePlayer';
 import { EntryExtras, TagMenu } from '@/src/components/EntryExtras';
 import { DeviceLock, IconButton, PalIcon, StyleIcon } from '@/src/components/IconButton';
 import { VoiceNote } from '@/src/components/VoiceNote';
@@ -568,6 +569,11 @@ function updateSticker(next: StickerPlacement) {
       </ScrollView>
 
       <FadeChrome hidden={deep}>
+      {draft.voiceNote ? (
+        <View style={{ paddingHorizontal: 12, paddingTop: 8, zIndex: 210, backgroundColor: theme.colors.bg }}>
+          <VoicePlayer source={draft.voiceNote} />
+        </View>
+      ) : null}
       {styleTab ? (
         <View style={{ maxHeight: 340, overflow: 'hidden', backgroundColor: theme.colors.card, borderTopWidth: 1, borderTopColor: theme.colors.paperEdge, paddingHorizontal: 10, paddingTop: 6, paddingBottom: Math.max(insets.bottom, 8), zIndex: 200 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>

@@ -50,6 +50,7 @@ jobs:
             found=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts" --jq '[.artifacts[] | select(.name=="github-pages")] | length' || echo 0)
             if [ "$found" != "0" ]; then
               echo "github-pages artifact is listed (attempt $attempt)"
+              sleep 8
               exit 0
             fi
             echo "Artifact not listed yet (attempt $attempt)"

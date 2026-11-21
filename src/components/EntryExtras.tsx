@@ -5,7 +5,6 @@ import { TEMPLATES } from '../logic/templates';
 import { capturePlace } from '../services/place';
 import { useDiary } from '../store/useDiary';
 import { useTheme } from '../theme/BookTheme';
-import { DrawingPad } from './DrawingPad';
 import { VoiceNote } from './VoiceNote';
 import { Button, FieldLabel } from './ui';
 
@@ -15,6 +14,7 @@ export function EntryExtras({
   draft,
   onChange,
   isNew,
+  onDraw,
 }: {
   draft: {
     title: string;
@@ -29,12 +29,12 @@ export function EntryExtras({
   };
   onChange: (patch: Partial<{ title: string; body: string; tags: string[]; activities: string[]; templateId: string | null; voiceNote: string | null; drawing: string | null; placeLabel: string | null; weather: string | null }>) => void;
   isNew: boolean;
+  onDraw?: () => void;
 }) {
   const theme = useTheme();
   const locationOn = useDiary((state) => state.settings.locationOnEntry);
   const weatherOn = useDiary((state) => state.settings.weatherOnEntry);
   const [tag, setTag] = useState('');
-  const [draw, setDraw] = useState(false);
 
   useEffect(() => {
     if (!isNew || (!locationOn && !weatherOn) || draft.placeLabel) return;
@@ -82,8 +82,7 @@ export function EntryExtras({
       </View>
       {draft.placeLabel || draft.weather ? <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>{[draft.placeLabel, draft.weather].filter(Boolean).join(' · ')}</Text> : null}
       <VoiceNote value={draft.voiceNote} onChange={(voiceNote) => onChange({ voiceNote })} />
-      <Button label={draw ? 'Hide drawing' : 'Draw on this page'} tone="ghost" onPress={() => setDraw((value) => !value)} />
-      {draw ? <DrawingPad value={draft.drawing} color={theme.colors.accent} onChange={(drawing) => onChange({ drawing })} /> : null}
+      <Button label="Draw on this page" tone="ghost" onPress={() => onDraw?.()} />
     </View>
   );
 }

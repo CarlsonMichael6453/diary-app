@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
-import { PanResponder, Platform, Pressable, Text, TextInput, View } from 'react-native';
-import Svg, { Path, Polyline } from 'react-native-svg';
+import { useEffect, useId, useRef, useState } from 'react';
+import { PanResponder, Platform, Pressable, Text, View } from 'react-native';
+import Svg, { Defs, G, Mask, Path, Polyline, Rect } from 'react-native-svg';
 
-import { DRAW_COLORS, PEN_SIZES, padStrokes, pageStrokes, pencilCursorCss, strokesFrom, type Stroke } from '../logic/drawing';
+import { DRAW_COLORS, PEN_SIZES, padStrokes, pageStrokes, pencilCursorCss, strokeRole, strokesFrom, type Stroke } from '../logic/drawing';
 import { isHexColor } from '../theme/designs';
 import { HorizontalStrip } from './HorizontalStrip';
 
@@ -31,32 +31,47 @@ export function PencilIcon({ color, size = 32 }: { color: string; size?: number 
   );
 }
 
-function StrokeLines({ strokes, paper }: { strokes: Stroke[]; paper: string }) {
+function StrokeLines({ strokes, live, maskId }: { strokes: Stroke[]; live?: Stroke | null; maskId: string }) {
+  const all = live?.points ? [...strokes, live] : strokes;
+  const ink = all.filter((stroke) => strokeRole(stroke.color) === 'ink');
+  const holes = all.filter((stroke) => strokeRole(stroke.color) === 'erase');
+  const line = (stroke: Stroke, index: number, paint: string) => (
+    <Polyline
+      key={`${paint}-${index}-${stroke.points.slice(0, 12)}`}
+      points={stroke.points}
+      fill="none"
+      stroke={paint === 'hole' ? '#000000' : stroke.color}
+      strokeWidth={stroke.size ?? 3}
+      strokeLinejoin="round"
+      strokeLinecap="round"
+    />
+  );
   return (
     <>
-      {strokes.map((stroke, index) => (
-        <Polyline
-          key={`${stroke.space ?? 'pad'}-${index}-${stroke.points.slice(0, 16)}`}
-          points={stroke.points}
-          fill="none"
-          stroke={stroke.color === 'eraser' ? paper : stroke.color}
-          strokeWidth={stroke.size ?? 3}
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
-      ))}
+      {holes.length > 0 ? (
+        <Defs>
+          <Mask id={maskId} maskUnits="userSpaceOnUse" x={0} y={0} width={4000} height={4000}>
+            <Rect x={0} y={0} width={4000} height={4000} fill="#ffffff" />
+            {holes.map((stroke, index) => line(stroke, index, 'hole'))}
+          </Mask>
+        </Defs>
+      ) : null}
+      <G mask={holes.length > 0 ? `url(#${maskId})` : undefined}>
+        {ink.map((stroke, index) => line(stroke, index, 'ink'))}
+      </G>
     </>
   );
 }
 
 /** Old drawings stay in the little box they were made in. */
-export function LegacyDrawing({ value, paper }: { value: string | null | undefined; paper: string }) {
+export function LegacyDrawing({ value }: { value: string | null | undefined; paper?: string }) {
   const strokes = padStrokes(strokesFrom(value));
+  const maskId = useId().replace(/:/g, '');
   if (strokes.length === 0) return null;
   return (
     <View pointerEvents="none" style={{ height: 180, borderRadius: 16, overflow: 'hidden' }}>
       <Svg width="100%" height="100%">
-        <StrokeLines strokes={strokes} paper={paper} />
+        <StrokeLines strokes={strokes} maskId={maskId} />
       </Svg>
     </View>
   );
@@ -199,17 +214,20 @@ export function DrawingSurface({
     }),
   ).current;
 
-  const ink = erase ? paper : color;
+  const maskId = useId().replace(/:/g, '');
+  const ink = erase ? '#C8C2B8' : color;
+  const liveStroke: Stroke | null = current
+    ? { points: current, color: erase ? 'eraser' : color, size: erase ? Math.max(size, 14) : size, space: 'page' }
+    : null;
   return (
     <View
       ref={host}
       {...(active && Platform.OS !== 'web' ? responder.panHandlers : {})}
       pointerEvents={active ? 'auto' : 'none'}
-      style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 120, touchAction: active ? 'none' : 'auto' } as object}
+      style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 100, touchAction: active ? 'none' : 'auto' } as object}
     >
       <Svg width="100%" height="100%" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
-        <StrokeLines strokes={pages} paper={paper} />
-        {current ? <Polyline points={current} fill="none" stroke={ink} strokeWidth={erase ? Math.max(size, 14) : size} strokeLinecap="round" strokeLinejoin="round" /> : null}
+        <StrokeLines strokes={pages} live={liveStroke} maskId={maskId} />
       </Svg>
       {active && finger ? (
         <View pointerEvents="none" style={{ position: 'absolute', left: finger.x - 3, top: finger.y - 29 }}>

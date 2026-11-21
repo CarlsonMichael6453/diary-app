@@ -5,8 +5,8 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 
 import { curlLayout, foldAngle } from '../logic/curl';
-import { decorationDrag } from '../logic/pageGesture';
-import { releaseCurl } from '../logic/swipe';
+import { decorationDrag, stripTouch } from '../logic/pageGesture';
+import { claimHorizontalSwipe, releaseCurl, verticalScrollWins } from '../logic/swipe';
 import { playCurlCommit } from '../services/sounds';
 import { useTheme } from '../theme/BookTheme';
 import { useReduceMotion } from '../theme/useReduceMotion';
@@ -167,11 +167,11 @@ export const PageFlip = forwardRef<
     () =>
       Gesture.Pan()
         .enabled(Platform.OS !== 'web')
-        .activeOffsetX([-16, 16])
+        .activeOffsetX([-12, 12])
         .failOffsetY([-18, 18])
         .onTouchesMove((event, manager) => {
           'worklet';
-          if (decorationDrag.value > 0 || editingSV.value > 0 || event.numberOfTouches > 1) manager.fail();
+          if (decorationDrag.value > 0 || stripTouch.value > 0 || editingSV.value > 0 || event.numberOfTouches > 1) manager.fail();
         })
         .onTouchesUp(() => {
           'worklet';
@@ -298,37 +298,51 @@ export const PageFlip = forwardRef<
 
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof window === 'undefined') return;
-    let drag: { x: number; y: number; left: number; top: number; active: boolean; vx: number; lastX: number; lastT: number; startT: number } | null = null;
+    let drag: { x: number; y: number; left: number; top: number; active: boolean; vx: number; lastX: number; lastT: number; startT: number; field: HTMLElement | null } | null = null;
     let settling = false;
-    const inside = (event: PointerEvent) => {
-      const node = document.getElementById('diary-page') ?? document.querySelector('[data-testid="diary-page"]');
-      const rect = node?.getBoundingClientRect();
-      if (!rect) return null;
-      if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) return null;
-      return rect;
+    const elementFrom = (event: Event) => {
+      const node = event.target as Node | null;
+      return (node instanceof Element ? node : node?.parentElement) as HTMLElement | null;
     };
-    const down = (event: PointerEvent) => {
-      if (settling || editingRef.current || decorationDrag.value > 0) return;
-      const rect = inside(event);
-      if (!rect) return;
-      drag = { x: event.clientX, y: event.clientY, left: rect.left, top: rect.top, active: false, vx: 0, lastX: event.clientX, lastT: event.timeStamp, startT: event.timeStamp };
+    const pageNode = () => {
+      const nodes = [...document.querySelectorAll('#diary-page, [data-testid="diary-page"]')];
+      return nodes.reverse().find((node) => {
+        const rect = node.getBoundingClientRect();
+        return rect.width > 40 && rect.height > 40 && rect.bottom > 0 && rect.top < window.innerHeight;
+      }) ?? null;
+    };
+    const begin = (clientX: number, clientY: number, timeStamp: number, targetNode: EventTarget | null, prevent: () => void) => {
+      if (drag && Math.abs(drag.x - clientX) < 8 && Math.abs(drag.y - clientY) < 8 && timeStamp - drag.startT < 40) return;
+      if (settling || editingRef.current || decorationDrag.value > 0 || stripTouch.value > 0) return;
+      const target = (targetNode instanceof Element ? targetNode : (targetNode as Node | null)?.parentElement) as HTMLElement | null;
+      if (target?.closest?.('[data-no-page-turn], [data-decoration]')) return;
+      const active = document.activeElement as HTMLElement | null;
+      if (active && active !== document.body && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) return;
+      const rect = pageNode()?.getBoundingClientRect();
+      if (!rect || clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) return;
+      const field = target?.closest?.('input, textarea') as HTMLElement | null;
+      if (field) prevent();
+      drag = { x: clientX, y: clientY, left: rect.left, top: rect.top, active: false, vx: 0, lastX: clientX, lastT: timeStamp, startT: timeStamp, field };
     };
     const follow = (clientX: number, clientY: number, timeStamp: number) => {
-      if (!drag || decorationDrag.value > 0) return;
+      if (!drag || decorationDrag.value > 0 || stripTouch.value > 0) return;
       const dx = clientX - drag.x;
       const dy = clientY - drag.y;
       if (!drag.active) {
-        if (Math.abs(dx) < 16 && Math.abs(dy) < 16) return;
-        if (!(Math.abs(dx) > Math.abs(dy) + 8)) {
+        if (claimHorizontalSwipe(dx, dy, false)) {
+          drag.active = true;
+          drag.field = null;
+          lock(true);
+          document.body.style.userSelect = 'none';
+          window.getSelection()?.removeAllRanges();
+          const active = document.activeElement as HTMLElement | null;
+          if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) active.blur();
+        } else if (verticalScrollWins(dx, dy)) {
           drag = null;
           return;
-        }
-        drag.active = true;
-        lock(true);
-        document.body.style.userSelect = 'none';
-        window.getSelection()?.removeAllRanges();
-        (document.activeElement as HTMLElement | null)?.blur?.();
+        } else return;
       }
+      if (!drag) return;
       const dt = timeStamp - drag.lastT;
       if (dt >= 12) {
         const sample = ((clientX - drag.lastX) / dt) * 1000;
@@ -350,15 +364,8 @@ export const PageFlip = forwardRef<
       side.value = nextward ? -1 : 1;
     };
     const move = (event: PointerEvent) => {
-      if (!drag) return;
-      if (drag.active && event.cancelable) event.preventDefault();
+      if (!drag || event.pointerType === 'touch') return;
       follow(event.clientX, event.clientY, event.timeStamp);
-    };
-    const touchMove = (event: TouchEvent) => {
-      const touch = event.touches[0];
-      if (!touch || !drag) return;
-      if (drag.active && event.cancelable) event.preventDefault();
-      follow(touch.clientX, touch.clientY, event.timeStamp);
     };
     const settle = (commit: boolean, direction: 'next' | 'prev') => {
       if (settling) return;
@@ -388,9 +395,11 @@ export const PageFlip = forwardRef<
       const w = width.value || 1;
       if (!current.active) {
         const localX = event.clientX - current.left;
-        const target = event.target as HTMLElement | null;
-        const interactive = target?.closest?.('button, a, input, textarea');
-        if (!interactive && Math.abs(event.clientX - current.x) < 14 && Math.abs(event.clientY - current.y) < 14) {
+        const target = elementFrom(event);
+        const interactive = target?.closest?.('button, a, input, textarea, [data-no-page-turn], [data-decoration]');
+        const tap = Math.abs(event.clientX - current.x) < 14 && Math.abs(event.clientY - current.y) < 14;
+        if (tap && current.field) current.field.focus();
+        if (!interactive && tap) {
           if (localX > w * 0.82 && edgeRef.current.canNext) settle(true, 'next');
           else if (localX < w * 0.18 && edgeRef.current.canPrev) settle(true, 'prev');
         }
@@ -410,23 +419,37 @@ export const PageFlip = forwardRef<
     };
     const fromTouch = (event: TouchEvent) => {
       const touch = event.changedTouches[0];
-      up(new PointerEvent('pointerup', { clientX: touch?.clientX ?? drag?.lastX ?? 0, clientY: touch?.clientY ?? drag?.y ?? 0 }));
+      up(new PointerEvent('pointerup', { clientX: touch?.clientX ?? drag?.lastX ?? 0, clientY: touch?.clientY ?? drag?.y ?? 0, bubbles: true }));
     };
-    const pageNode = document.getElementById('diary-page');
-    if (pageNode) pageNode.style.touchAction = 'pan-y';
-    window.addEventListener('pointerdown', down, true);
-    window.addEventListener('pointermove', move, { capture: true, passive: false });
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.pointerType === 'touch') return;
+      begin(event.clientX, event.clientY, event.timeStamp, event.target, () => event.preventDefault());
+    };
+    const onTouchStart = (event: TouchEvent) => {
+      const touch = event.changedTouches[0];
+      if (!touch) return;
+      begin(touch.clientX, touch.clientY, event.timeStamp, event.target, () => undefined);
+    };
+    const onTouchMove = (event: TouchEvent) => {
+      const touch = event.touches[0];
+      if (!touch) return;
+      follow(touch.clientX, touch.clientY, event.timeStamp);
+    };
+    window.addEventListener('pointerdown', onPointerDown, true);
+    window.addEventListener('pointermove', move, { capture: true, passive: true });
     window.addEventListener('pointerup', up, true);
     window.addEventListener('pointercancel', up, true);
-    window.addEventListener('touchmove', touchMove, { capture: true, passive: false });
+    window.addEventListener('touchstart', onTouchStart, { capture: true, passive: true });
+    window.addEventListener('touchmove', onTouchMove, { capture: true, passive: true });
     window.addEventListener('touchend', fromTouch, true);
     window.addEventListener('touchcancel', fromTouch, true);
     return () => {
-      window.removeEventListener('pointerdown', down, true);
+      window.removeEventListener('pointerdown', onPointerDown, true);
       window.removeEventListener('pointermove', move, true);
       window.removeEventListener('pointerup', up, true);
       window.removeEventListener('pointercancel', up, true);
-      window.removeEventListener('touchmove', touchMove, true);
+      window.removeEventListener('touchstart', onTouchStart, true);
+      window.removeEventListener('touchmove', onTouchMove, true);
       window.removeEventListener('touchend', fromTouch, true);
       window.removeEventListener('touchcancel', fromTouch, true);
     };
@@ -449,7 +472,7 @@ export const PageFlip = forwardRef<
         <View pointerEvents="none" style={StyleSheet.absoluteFill}>{nextSheet}</View>
         <Animated.View style={fadeStyle}>
           <Animated.View style={[{ overflow: 'hidden' }, currentStyle]}>
-            <View style={{ width: pageW || '100%' }}>{children}</View>
+            <View style={{ width: pageW || '100%', minHeight: '100%', flexGrow: 1 }}>{children}</View>
           </Animated.View>
         </Animated.View>
         <Animated.View pointerEvents="none" style={[styles.prev, prevStyle]}>

@@ -44,6 +44,7 @@ function PlacedBox({
   onSelect,
   onMove,
   captureTap = true,
+  decorate = false,
   children,
 }: {
   x: number;
@@ -57,6 +58,7 @@ function PlacedBox({
   onSelect: () => void;
   onMove: (next: { x: number; y: number; scale: number; rotation: number }) => void;
   captureTap?: boolean;
+  decorate?: boolean;
   children: ReactNode;
 }) {
   const live = useRef({ x, y, scale, rotation });
@@ -117,7 +119,14 @@ function PlacedBox({
   if (pageWidth < 20) return null;
   const size = BASE * scale;
   return (
-    <View {...pan.panHandlers} style={{ position: 'absolute', left: x * pageWidth - size / 2, top: y * pageHeight - size / 2, width: size, transform: [{ rotate: `${rotation}deg` }], zIndex }}>
+    <View
+      {...(decorate ? pan.panHandlers : {})}
+      pointerEvents={decorate ? 'auto' : 'none'}
+      ref={(node) => {
+        (node as { setAttribute?: (name: string, value: string) => void } | null)?.setAttribute?.('data-decoration', '1');
+      }}
+      style={{ position: 'absolute', left: x * pageWidth - size / 2, top: y * pageHeight - size / 2, width: size, transform: [{ rotate: `${rotation}deg` }], zIndex }}
+    >
       {children}
       {selected ? <View {...scalePan.panHandlers} style={styles.knob} /> : null}
       {selected ? <View style={styles.turn} onTouchEnd={() => moveRef.current({ ...live.current, rotation: (live.current.rotation + 15) % 360 })} /> : null}
@@ -137,6 +146,7 @@ export function PhotoNoteLayer({
   onChangeNote,
   onEditNote,
   onEditing,
+  decorate = false,
 }: {
   photos: PhotoPlacement[];
   notes: NotePlacement[];
@@ -149,6 +159,7 @@ export function PhotoNoteLayer({
   onChangeNote: (next: NotePlacement) => void;
   onEditNote: (id: string, text: string) => void;
   onEditing: (editing: boolean) => void;
+  decorate?: boolean;
 }) {
   const theme = useTheme();
   return (
@@ -168,6 +179,7 @@ export function PhotoNoteLayer({
             selected={selectedId === photo.id}
             onSelect={() => onSelect(photo.id)}
             onMove={(next) => onChangePhoto({ ...photo, ...next })}
+            decorate={decorate}
           >
             <View style={[frameStyle(photo.frame), { width: '100%' }]}>
               {photo.frame === 'tape' ? <View style={styles.tape} /> : null}
@@ -194,6 +206,7 @@ export function PhotoNoteLayer({
             onSelect={() => onSelect(note.id)}
             onMove={(next) => onChangeNote({ ...note, ...next })}
             captureTap={false}
+            decorate={decorate}
           >
             <View style={[chrome, { width: '100%' }, note.style === 'torn' && { borderWidth: 1, borderStyle: 'dashed', borderColor: '#C4B49A' }]}>
               {selectedId === note.id ? (

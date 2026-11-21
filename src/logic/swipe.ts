@@ -1,9 +1,14 @@
-/** Horizontal page turns should win only after the gesture is clearly sideways. */
+/** A vertical drag stays a scroll. A page turn waits for a clearly sideways move. */
 export function claimHorizontalSwipe(dx: number, dy: number, editing: boolean): boolean {
   'worklet';
   if (editing) return false;
-  if (Math.abs(dx) < 16 && Math.abs(dy) < 16) return false;
-  return Math.abs(dx) > Math.abs(dy) + 8;
+  return Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy) * 1.5;
+}
+
+/** The finger has moved enough, and not sideways, so the page should scroll. */
+export function verticalScrollWins(dx: number, dy: number): boolean {
+  'worklet';
+  return Math.abs(dy) > 12 && Math.abs(dy) >= Math.abs(dx);
 }
 
 /** A light swipe or a modest flick finishes the turn. A blocked edge never commits. */

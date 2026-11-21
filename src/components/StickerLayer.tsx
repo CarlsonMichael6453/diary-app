@@ -92,7 +92,11 @@ function PlacedSticker({
   const size = BASE * placement.scale;
   return (
     <View
-      {...pan.panHandlers}
+      {...(decorate ? pan.panHandlers : {})}
+      pointerEvents={decorate ? 'auto' : 'none'}
+      ref={(node) => {
+        (node as { setAttribute?: (name: string, value: string) => void } | null)?.setAttribute?.('data-decoration', '1');
+      }}
       style={{
         position: 'absolute',
         left: placement.x * pageWidth - size / 2,

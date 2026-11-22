@@ -122,13 +122,18 @@ function Teaser({ pack, slot }: { pack: PackDef; slot: SeasonSlot }) {
   const theme = useTheme();
   const offer = packOffer(pack);
   const price = offer.kind === 'premium' ? 'Diary Plus' : `${offer.coins} coins`;
+  const preview = stickersInPack(pack.id).slice(0, 4);
   return (
-    <View style={{ backgroundColor: theme.colors.card, borderRadius: theme.radius, padding: 14, gap: 4, opacity: 0.92 }}>
-      <Text style={{ fontSize: 28 }}>{pack.emoji ?? '✦'}</Text>
+    <View style={{ backgroundColor: theme.colors.card, borderRadius: theme.radius, padding: 14, gap: 6, opacity: 0.92 }}>
+      <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+        {preview.map((sticker) => (
+          <StickerView key={sticker.id} stickerId={sticker.id} size={48} />
+        ))}
+      </View>
       <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 22 }}>{pack.name}</Text>
       <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>{pack.blurb}</Text>
       <Text style={{ color: theme.colors.accent, fontFamily: theme.body }}>{arrivingLabel(slot.days)}</Text>
-      <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>{price} · preview opens when it arrives</Text>
+      <Text style={{ color: theme.colors.ink, fontFamily: theme.body }}>{price}</Text>
     </View>
   );
 }

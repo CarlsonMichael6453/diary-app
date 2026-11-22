@@ -408,7 +408,7 @@ function RoomThing({
       style={{ position: 'absolute', left: `${item.x * 100}%`, top: `${item.y * 100}%`, marginLeft: -box.width / 2, marginTop: -box.height / 2, zIndex: (item.z ?? 0) + 1, borderWidth: selected ? 2 : 0, borderColor: '#8C2F39', borderRadius: 8, transform: [{ scaleX: item.flip ? -1 : 1 }] }}
     >
       <Animated.View style={{ transform: [{ scaleX: squashX }, { scaleY: squashY }] }}>
-        <Pressable accessibilityRole="button" accessibilityLabel={item.kind === 'easel' ? 'Open easel' : frame ? 'Picture frame' : item.kind} onPress={() => { if (!decorate && !frame && item.kind === 'easel') onOpen(); }}>
+        <Pressable accessibilityRole="button" accessibilityLabel={item.kind === 'easel' ? 'Open easel' : frame ? 'Picture frame' : item.kind} onPress={() => { onSelect(); if (!decorate && item.kind === 'easel') onOpen(); }}>
           <RoomSprite kind={item.kind} photo={item.photo} drawing={item.drawing} ink={ink} width={box.width} />
         </Pressable>
         {selected && frame ? (

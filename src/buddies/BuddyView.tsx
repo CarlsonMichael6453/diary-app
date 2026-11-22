@@ -125,7 +125,7 @@ function flower(x: number, y: number, fill: string, size = 7) {
 }
 
 function Outfits({ ids, anchors, behind }: { ids: string[]; anchors: BuddyDef['anchors']; behind?: boolean }) {
-  const back = new Set(['cape']);
+  const back = new Set<string>();
   const list = ids.filter((id) => (behind ? back.has(id) : !back.has(id)));
   return (
     <G>
@@ -141,98 +141,206 @@ function drawOutfit(id: string, anchors: BuddyDef['anchors']) {
   const neck = anchors.neck;
   const face = anchors.face;
   const pin = anchors.pin;
+  const s = anchors.scale ?? 1;
   if (id === 'cape') {
-    return <Path d={`M ${neck.x - 26} ${neck.y - 6} Q ${neck.x} ${neck.y + 46} ${neck.x + 26} ${neck.y - 6} L ${neck.x + 16} ${neck.y + 28} L ${neck.x - 16} ${neck.y + 28} Z`} fill="#7C3A55" />;
-  }
-  if (id === 'bow') {
+    const y = neck.y;
+    const x = neck.x;
     return (
       <G>
-        <Ellipse cx={hat.x - 10} cy={hat.y} rx={9} ry={6} fill="#FF4F9A" transform={`rotate(-18 ${hat.x - 10} ${hat.y})`} />
-        <Ellipse cx={hat.x + 10} cy={hat.y} rx={9} ry={6} fill="#FF4F9A" transform={`rotate(18 ${hat.x + 10} ${hat.y})`} />
-        <Circle cx={hat.x} cy={hat.y} r={4} fill="#FFE56A" />
+        <Path d={`M ${x - 8 * s} ${y - 2 * s} Q ${x} ${y + 4 * s} ${x + 8 * s} ${y - 2 * s}`} stroke="#F2C14E" strokeWidth={3 * s} fill="none" />
+        <Path
+          d={`M ${x - 22 * s} ${y} Q ${x - 28 * s} ${y + 36 * s} ${x - 10 * s} ${y + 48 * s} L ${x - 4 * s} ${y + 8 * s} Z`}
+          fill="#7C3A55"
+        />
+        <Path
+          d={`M ${x + 22 * s} ${y} Q ${x + 28 * s} ${y + 36 * s} ${x + 10 * s} ${y + 48 * s} L ${x + 4 * s} ${y + 8 * s} Z`}
+          fill="#9A4A68"
+        />
+        <Circle cx={x} cy={y} r={3.2 * s} fill="#F2C14E" />
+      </G>
+    );
+  }
+  if (id === 'bow') {
+    const x = hat.x;
+    const y = hat.y;
+    return (
+      <G>
+        <Path d={`M ${x} ${y} L ${x - 8 * s} ${y + 16 * s} L ${x - 2 * s} ${y + 6 * s} Z`} fill="#FF8AC6" />
+        <Path d={`M ${x} ${y} L ${x + 8 * s} ${y + 16 * s} L ${x + 2 * s} ${y + 6 * s} Z`} fill="#FF4F9A" />
+        <Ellipse cx={x - 11 * s} cy={y - 1 * s} rx={9 * s} ry={6 * s} fill="#FF4F9A" transform={`rotate(-24 ${x - 11 * s} ${y})`} />
+        <Ellipse cx={x + 11 * s} cy={y - 1 * s} rx={9 * s} ry={6 * s} fill="#FF77B5" transform={`rotate(24 ${x + 11 * s} ${y})`} />
+        <Circle cx={x} cy={y} r={3.4 * s} fill="#FFE56A" stroke="#E7B15A" strokeWidth={0.6} />
       </G>
     );
   }
   if (id === 'party-hat') {
+    const x = hat.x;
+    const y = hat.y;
     return (
       <G>
-        <Polygon points={`${hat.x},${hat.y - 26} ${hat.x - 12},${hat.y + 2} ${hat.x + 12},${hat.y + 2}`} fill="#FF8A5B" />
-        <Circle cx={hat.x} cy={hat.y - 28} r={3.5} fill="#FFE56A" />
+        <Ellipse cx={x} cy={y + 2 * s} rx={14 * s} ry={4.2 * s} fill="#F2C14E" />
+        <Polygon points={`${x},${y - 28 * s} ${x - 12 * s},${y + 2 * s} ${x + 12 * s},${y + 2 * s}`} fill="#FF8A5B" />
+        <Path d={`M ${x - 8 * s} ${y - 8 * s} L ${x + 8 * s} ${y - 4 * s}`} stroke="#FFE56A" strokeWidth={2.4 * s} />
+        <Path d={`M ${x - 5 * s} ${y - 16 * s} L ${x + 6 * s} ${y - 12 * s}`} stroke="#FFF6D8" strokeWidth={2 * s} />
+        <Circle cx={x} cy={y - 30 * s} r={3.6 * s} fill="#FFE56A" />
       </G>
     );
   }
   if (id === 'headphones') {
+    const x = face.x;
+    const y = face.y + 2 * s;
     return (
       <G>
-        <Path d={`M ${hat.x - 18} ${hat.y + 4} Q ${hat.x} ${hat.y - 20} ${hat.x + 18} ${hat.y + 4}`} stroke="#3A3148" strokeWidth={3} fill="none" />
-        <Rect x={hat.x - 22} y={hat.y} width={8} height={12} rx={3} fill="#3A3148" />
-        <Rect x={hat.x + 14} y={hat.y} width={8} height={12} rx={3} fill="#FF4FD8" />
+        <Path d={`M ${x - 16 * s} ${y} Q ${hat.x} ${hat.y - 10 * s} ${x + 16 * s} ${y}`} stroke="#3A3148" strokeWidth={3.2 * s} fill="none" />
+        <Rect x={x - 22 * s} y={y - 6 * s} width={10 * s} height={14 * s} rx={3 * s} fill="#3A3148" />
+        <Rect x={x - 20 * s} y={y - 4 * s} width={6 * s} height={10 * s} rx={2 * s} fill="#6A5A78" />
+        <Rect x={x + 12 * s} y={y - 6 * s} width={10 * s} height={14 * s} rx={3 * s} fill="#FF4FD8" />
+        <Rect x={x + 14 * s} y={y - 4 * s} width={6 * s} height={10 * s} rx={2 * s} fill="#FFD0EA" />
       </G>
     );
   }
   if (id === 'scarf') {
+    const x = neck.x;
+    const y = neck.y;
     return (
       <G>
-        <Path d={`M ${neck.x - 22} ${neck.y} Q ${neck.x} ${neck.y + 10} ${neck.x + 22} ${neck.y}`} stroke="#E36B8A" strokeWidth={8} fill="none" strokeLinecap="round" />
-        <Path d={`M ${neck.x + 10} ${neck.y} L ${neck.x + 16} ${neck.y + 22}`} stroke="#C47B5A" strokeWidth={6} fill="none" strokeLinecap="round" />
+        <Path
+          d={`M ${x - 24 * s} ${y + 2 * s} C ${x - 8 * s} ${y - 10 * s} ${x + 10 * s} ${y - 8 * s} ${x + 22 * s} ${y + 1 * s} C ${x + 8 * s} ${y + 10 * s} ${x - 6 * s} ${y + 12 * s} ${x - 16 * s} ${y + 4 * s}`}
+          stroke="#E45B7A"
+          strokeWidth={8 * s}
+          fill="none"
+          strokeLinecap="round"
+        />
+        <Path
+          d={`M ${x - 20 * s} ${y + 1 * s} C ${x - 4 * s} ${y - 6 * s} ${x + 8 * s} ${y - 4 * s} ${x + 16 * s} ${y + 2 * s}`}
+          stroke="#F7C2D0"
+          strokeWidth={1.6 * s}
+          fill="none"
+          strokeDasharray={`${2.4 * s} ${2 * s}`}
+        />
+        <Path d={`M ${x - 12 * s} ${y + 5 * s} L ${x - 6 * s} ${y + 28 * s} L ${x + 1 * s} ${y + 6 * s} Z`} fill="#D45374" />
+        <Path d={`M ${x + 4 * s} ${y + 3 * s} L ${x + 14 * s} ${y + 24 * s} L ${x + 20 * s} ${y + 2 * s} Z`} fill="#C44768" />
+        {[0, 1, 2, 3].map((index) => (
+          <Line
+            key={`left-${index}`}
+            x1={x - 8 * s + index * 2.1 * s}
+            y1={y + 27 * s}
+            x2={x - 9 * s + index * 2.2 * s}
+            y2={y + 33 * s}
+            stroke="#F4A3B8"
+            strokeWidth={1.2 * s}
+          />
+        ))}
+        {[0, 1, 2].map((index) => (
+          <Line
+            key={`right-${index}`}
+            x1={x + 10 * s + index * 2.2 * s}
+            y1={y + 23 * s}
+            x2={x + 9 * s + index * 2.3 * s}
+            y2={y + 29 * s}
+            stroke="#E7A0B4"
+            strokeWidth={1.2 * s}
+          />
+        ))}
       </G>
     );
   }
   if (id === 'ribbon') {
+    const x = neck.x;
+    const y = neck.y;
     return (
       <G>
-        <Path d={`M ${neck.x - 8} ${neck.y} L ${neck.x - 18} ${neck.y + 18} L ${neck.x - 2} ${neck.y + 8} Z`} fill="#F2A2B8" />
-        <Path d={`M ${neck.x + 8} ${neck.y} L ${neck.x + 18} ${neck.y + 18} L ${neck.x + 2} ${neck.y + 8} Z`} fill="#E45B86" />
-        <Circle cx={neck.x} cy={neck.y} r={3.5} fill="#F7C98A" />
+        <Ellipse cx={x - 9 * s} cy={y} rx={8 * s} ry={5 * s} fill="#F2A2B8" transform={`rotate(-20 ${x - 9 * s} ${y})`} />
+        <Ellipse cx={x + 9 * s} cy={y} rx={8 * s} ry={5 * s} fill="#E45B86" transform={`rotate(20 ${x + 9 * s} ${y})`} />
+        <Path d={`M ${x - 3 * s} ${y + 2 * s} L ${x - 12 * s} ${y + 20 * s} L ${x - 2 * s} ${y + 16 * s} Z`} fill="#F7C2D2" />
+        <Path d={`M ${x + 3 * s} ${y + 2 * s} L ${x + 12 * s} ${y + 20 * s} L ${x + 2 * s} ${y + 16 * s} Z`} fill="#E45B86" />
+        <Circle cx={x} cy={y} r={3.2 * s} fill="#F7C98A" />
       </G>
     );
   }
   if (id === 'pearls') {
     return (
       <G>
-        {[-14, -7, 0, 7, 14].map((offset) => (
-          <Circle key={offset} cx={neck.x + offset} cy={neck.y + Math.abs(offset) * 0.15} r={3} fill="#F7F4EE" stroke="#E2D3C0" strokeWidth={0.6} />
-        ))}
+        {[-3, -2, -1, 0, 1, 2, 3].map((index) => {
+          const t = index / 3;
+          return (
+            <Circle
+              key={index}
+              cx={neck.x + t * 16 * s}
+              cy={neck.y + Math.abs(t) * 7 * s}
+              r={(index === 0 ? 3.4 : 2.7) * s}
+              fill="#F7F4EE"
+              stroke="#E2D3C0"
+              strokeWidth={0.7}
+            />
+          );
+        })}
+        <Circle cx={neck.x} cy={neck.y - 1 * s} r={1.3 * s} fill="#F2C14E" />
       </G>
     );
   }
   if (id === 'glasses') {
+    const x = face.x;
+    const y = face.y;
+    const gap = 12 * s;
+    const lens = 7.2 * s;
     return (
       <G>
-        <Circle cx={face.x - 11} cy={face.y} r={8} stroke="#1A1A40" strokeWidth={2} fill="rgba(255,255,255,0.15)" />
-        <Circle cx={face.x + 11} cy={face.y} r={8} stroke="#1A1A40" strokeWidth={2} fill="rgba(255,255,255,0.15)" />
-        <Line x1={face.x - 3} y1={face.y} x2={face.x + 3} y2={face.y} stroke="#1A1A40" strokeWidth={2} />
-        <Circle cx={face.x - 12} cy={face.y - 2} r={1.4} fill="#FFE56A" />
+        <Circle cx={x - gap} cy={y} r={lens} stroke="#1A1A40" strokeWidth={1.8 * s} fill="rgba(255,255,255,0.18)" />
+        <Circle cx={x + gap} cy={y} r={lens} stroke="#1A1A40" strokeWidth={1.8 * s} fill="rgba(255,255,255,0.18)" />
+        <Path d={`M ${x - gap + lens} ${y} H ${x + gap - lens}`} stroke="#1A1A40" strokeWidth={1.6 * s} />
+        <Path d={`M ${x - gap - lens} ${y - 1 * s} L ${x - gap - lens - 6 * s} ${y - 4 * s}`} stroke="#1A1A40" strokeWidth={1.5 * s} />
+        <Path d={`M ${x + gap + lens} ${y - 1 * s} L ${x + gap + lens + 6 * s} ${y - 4 * s}`} stroke="#1A1A40" strokeWidth={1.5 * s} />
+        <Circle cx={x - gap - 2 * s} cy={y - 2 * s} r={1.3 * s} fill="#FFE56A" />
       </G>
     );
   }
   if (id === 'crown-flower') {
+    const x = hat.x;
+    const y = hat.y;
     return (
       <G>
-        {flower(hat.x - 14, hat.y + 2, '#F4A3B8', 5)}
-        {flower(hat.x, hat.y - 4, '#FF8A7A', 6)}
-        {flower(hat.x + 14, hat.y + 2, '#C9B6F2', 5)}
+        <Path d={`M ${x - 18 * s} ${y + 4 * s} Q ${x} ${y - 6 * s} ${x + 18 * s} ${y + 4 * s}`} stroke="#6E9A55" strokeWidth={2 * s} fill="none" />
+        {flower(x - 14 * s, y + 1 * s, '#F4A3B8', 5 * s)}
+        {flower(x, y - 5 * s, '#FF8A7A', 6 * s)}
+        {flower(x + 14 * s, y + 1 * s, '#C9B6F2', 5 * s)}
       </G>
     );
   }
   if (id === 'moon-pin') {
     return (
       <G>
-        <Circle cx={pin.x} cy={pin.y} r={7} fill="#F2C14E" />
-        <Circle cx={pin.x + 3} cy={pin.y - 2} r={5.5} fill="#FFF8E8" />
+        <Path
+          d={`M ${pin.x + 2 * s} ${pin.y - 8 * s} A ${8 * s} ${8 * s} 0 1 0 ${pin.x + 2 * s} ${pin.y + 8 * s} A ${5.5 * s} ${5.5 * s} 0 1 1 ${pin.x + 2 * s} ${pin.y - 8 * s}`}
+          fill="#F2C14E"
+        />
+        <Circle cx={pin.x + 8 * s} cy={pin.y - 6 * s} r={1 * s} fill="#FFF6D8" />
       </G>
     );
   }
   if (id === 'wand') {
+    const x = pin.x;
+    const y = pin.y;
     return (
       <G>
-        <Line x1={pin.x - 8} y1={pin.y + 12} x2={pin.x + 6} y2={pin.y - 10} stroke="#C47B5A" strokeWidth={3} strokeLinecap="round" />
-        <Polygon points={`${pin.x + 6},${pin.y - 18} ${pin.x + 2},${pin.y - 8} ${pin.x + 12},${pin.y - 10} ${pin.x + 4},${pin.y - 4} ${pin.x + 10},${pin.y + 2}`} fill="#FFE56A" />
+        <Line x1={x - 10 * s} y1={y + 14 * s} x2={x + 4 * s} y2={y - 8 * s} stroke="#C47B5A" strokeWidth={3 * s} strokeLinecap="round" />
+        <Circle cx={x - 12 * s} cy={y + 16 * s} r={2.2 * s} fill="#E7C16A" />
+        <Polygon
+          points={`${x + 6 * s},${y - 20 * s} ${x + 8 * s},${y - 12 * s} ${x + 16 * s},${y - 12 * s} ${x + 10 * s},${y - 7 * s} ${x + 13 * s},${y + 1 * s} ${x + 6 * s},${y - 4 * s} ${x - 1 * s},${y + 1 * s} ${x + 2 * s},${y - 7 * s} ${x - 4 * s},${y - 12 * s} ${x + 4 * s},${y - 12 * s}`}
+          fill="#FFE56A"
+          stroke="#E7B15A"
+          strokeWidth={0.6}
+        />
       </G>
     );
   }
   if (id === 'halo') {
-    return <Ellipse cx={hat.x} cy={hat.y - 16} rx={16} ry={5} stroke="#F2C14E" strokeWidth={3} fill="none" />;
+    return (
+      <G>
+        <Ellipse cx={hat.x} cy={hat.y - 14 * s} rx={16 * s} ry={5 * s} stroke="#F2C14E" strokeWidth={3 * s} fill="none" />
+        <Ellipse cx={hat.x} cy={hat.y - 15 * s} rx={10 * s} ry={2 * s} stroke="#FFF6D8" strokeWidth={1.2 * s} fill="none" />
+      </G>
+    );
   }
   return null;
 }
@@ -674,18 +782,10 @@ export function BuddyView({
       <Animated.View style={{ transform: [{ scaleX }, { scaleY }] }}>
         <Animated.View style={{ transform: bobTransform }}>
           <Svg width={size} height={size * (170 / 160)} viewBox="0 0 160 170">
-            <Ellipse cx={80} cy={160} rx={48} ry={10} fill={ink} opacity={0.07} />
-            <Ellipse cx={80} cy={158} rx={36} ry={6.5} fill={ink} opacity={0.11} />
-            <Ellipse cx={80} cy={157} rx={22} ry={3.5} fill={ink} opacity={0.16} />
-            <Path d="M44 54 C30 66 24 96 36 124 C48 152 68 166 92 156 C122 170 150 140 140 104 C154 68 126 30 94 24 C66 16 52 34 44 54 Z" fill="#FFFFFF" />
-            <Path d="M44 54 C30 66 24 96 36 124 C48 152 68 166 92 156 C122 170 150 140 140 104 C154 68 126 30 94 24 C66 16 52 34 44 54 Z" fill="none" stroke="#FFFFFF" strokeWidth={6} strokeLinejoin="round" />
-            <Path d="M46 50 C28 68 26 98 40 126 C52 150 72 162 94 152 C118 164 146 134 136 100 C148 66 122 32 90 28 C64 20 54 36 46 50 Z" fill="none" stroke={ink} strokeWidth={1.35} strokeLinejoin="round" />
+            <Ellipse cx={80} cy={160} rx={42} ry={8} fill={ink} opacity={0.08} />
+            <Ellipse cx={80} cy={158} rx={28} ry={4.5} fill={ink} opacity={0.12} />
             <Outfits ids={outfits} anchors={buddy.anchors} behind />
             {Draw ? <Draw {...drawProps} /> : <Circle cx={80} cy={90} r={30} fill={theme.colors.accent} />}
-            <G opacity={0.09} stroke={ink} strokeWidth={0.7} fill="none">
-              <Path d="M58 78 H104 M50 104 H118 M66 128 H122" />
-              <Path d="M72 66 l7 5 M108 92 l6 -4" />
-            </G>
             {SIGNATURES[buddy.id] ?? null}
             <Outfits ids={outfits} anchors={buddy.anchors} />
             {doodle(ctx.mood)}

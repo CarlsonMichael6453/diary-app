@@ -26,7 +26,8 @@ export type BuddyDef = {
   blurb: string;
   premium: boolean;
   perch: 'br' | 'tr' | 'tl' | 'bl' | 'banner';
-  anchors: { hat: Anchor; neck: Anchor; face: Anchor; pin: Anchor };
+  /** hat = crown, face = eyes, neck = between head and body, pin = chest. scale fits the pal's head. */
+  anchors: { hat: Anchor; neck: Anchor; face: Anchor; pin: Anchor; scale: number };
   lines: {
     idle: string;
     writing: string;
@@ -62,10 +63,11 @@ export const OUTFITS: OutfitDef[] = [
 ];
 
 const baseAnchors = {
-  hat: { x: 80, y: 40 },
-  neck: { x: 80, y: 118 },
+  hat: { x: 80, y: 46 },
+  neck: { x: 80, y: 106 },
   face: { x: 80, y: 78 },
-  pin: { x: 118, y: 124 },
+  pin: { x: 112, y: 128 },
+  scale: 1,
 };
 
 export const BUDDIES: BuddyDef[] = [
@@ -104,7 +106,7 @@ export const BUDDIES: BuddyDef[] = [
     blurb: 'Hangs from the corner and sways while you write.',
     premium: false,
     perch: 'tr',
-    anchors: { hat: { x: 80, y: 118 }, neck: { x: 80, y: 78 }, face: { x: 80, y: 108 }, pin: { x: 112, y: 96 } },
+    anchors: { hat: { x: 80, y: 92 }, neck: { x: 80, y: 100 }, face: { x: 80, y: 110 }, pin: { x: 104, y: 82 }, scale: 0.85 },
     lines: {
       idle: 'Upside down is just another margin.',
       writing: 'The candle is lit. I am listening.',
@@ -132,7 +134,7 @@ export const BUDDIES: BuddyDef[] = [
     blurb: 'Grows a flower for every day of your writing streak.',
     premium: false,
     perch: 'br',
-    anchors: { hat: { x: 80, y: 48 }, neck: { x: 80, y: 112 }, face: { x: 80, y: 78 }, pin: { x: 118, y: 120 } },
+    anchors: { hat: { x: 80, y: 74 }, neck: { x: 80, y: 122 }, face: { x: 80, y: 102 }, pin: { x: 96, y: 128 }, scale: 0.8 },
     lines: {
       idle: 'The soil of this page is still warm.',
       writing: 'Words are a kind of rain. Thank you.',
@@ -160,7 +162,7 @@ export const BUDDIES: BuddyDef[] = [
     blurb: 'Cheers, sparkles, and means it when you finish a page.',
     premium: false,
     perch: 'br',
-    anchors: baseAnchors,
+    anchors: { hat: { x: 80, y: 56 }, neck: { x: 80, y: 116 }, face: { x: 80, y: 86 }, pin: { x: 104, y: 124 }, scale: 1 },
     lines: {
       idle: 'I warmed up the pom-poms.',
       writing: 'Yes yes yes, keep going.',
@@ -188,7 +190,7 @@ export const BUDDIES: BuddyDef[] = [
     blurb: 'Shifts color to match the mood of the page.',
     premium: false,
     perch: 'banner',
-    anchors: { hat: { x: 92, y: 58 }, neck: { x: 88, y: 108 }, face: { x: 96, y: 86 }, pin: { x: 124, y: 112 } },
+    anchors: { hat: { x: 118, y: 76 }, neck: { x: 110, y: 108 }, face: { x: 118, y: 94 }, pin: { x: 96, y: 116 }, scale: 0.75 },
     lines: {
       idle: 'I am wearing the color of waiting.',
       writing: 'Tell me the mood. I will match it.',
@@ -216,7 +218,7 @@ export const BUDDIES: BuddyDef[] = [
     blurb: 'Doodles in the margin based on how the page feels.',
     premium: false,
     perch: 'tl',
-    anchors: { hat: { x: 78, y: 52 }, neck: { x: 80, y: 112 }, face: { x: 80, y: 84 }, pin: { x: 118, y: 118 } },
+    anchors: { hat: { x: 78, y: 50 }, neck: { x: 78, y: 108 }, face: { x: 78, y: 84 }, pin: { x: 112, y: 116 }, scale: 0.9 },
     lines: {
       idle: 'I am just testing the pen.',
       writing: 'Your letters have good shoulders.',
@@ -244,7 +246,7 @@ export const BUDDIES: BuddyDef[] = [
     blurb: 'Reads the daily prompt out loud, in a chick way.',
     premium: false,
     perch: 'br',
-    anchors: { hat: { x: 74, y: 46 }, neck: { x: 74, y: 116 }, face: { x: 74, y: 78 }, pin: { x: 118, y: 120 } },
+    anchors: { hat: { x: 74, y: 48 }, neck: { x: 72, y: 104 }, face: { x: 73, y: 76 }, pin: { x: 92, y: 118 }, scale: 0.9 },
     lines: {
       idle: 'I have the prompt. No spoilers. Some spoilers.',
       writing: 'That is a good answer to the question.',
@@ -272,7 +274,7 @@ export const BUDDIES: BuddyDef[] = [
     blurb: 'Glows brighter the longer your writing streak lasts.',
     premium: false,
     perch: 'br',
-    anchors: { hat: { x: 80, y: 36 }, neck: { x: 80, y: 108 }, face: { x: 80, y: 82 }, pin: { x: 120, y: 96 } },
+    anchors: { hat: { x: 80, y: 40 }, neck: { x: 80, y: 108 }, face: { x: 80, y: 88 }, pin: { x: 108, y: 100 }, scale: 0.9 },
     lines: {
       idle: 'Low glow. I am conserving twinkle.',
       writing: 'You woke a point of light.',
@@ -300,7 +302,7 @@ export const BUDDIES: BuddyDef[] = [
     blurb: 'Drifts across the top of the page while you write.',
     premium: false,
     perch: 'banner',
-    anchors: { hat: { x: 80, y: 42 }, neck: { x: 80, y: 96 }, face: { x: 80, y: 70 }, pin: { x: 112, y: 100 } },
+    anchors: { hat: { x: 80, y: 34 }, neck: { x: 80, y: 80 }, face: { x: 80, y: 64 }, pin: { x: 108, y: 70 }, scale: 0.85 },
     lines: {
       idle: 'Just drifting. The page is a tide pool.',
       writing: 'Your sentences make a current.',
@@ -328,7 +330,7 @@ export const BUDDIES: BuddyDef[] = [
     blurb: 'Hides at first, then waves once the book fills up.',
     premium: false,
     perch: 'bl',
-    anchors: { hat: { x: 80, y: 48 }, neck: { x: 80, y: 112 }, face: { x: 80, y: 86 }, pin: { x: 116, y: 120 } },
+    anchors: { hat: { x: 80, y: 78 }, neck: { x: 80, y: 122 }, face: { x: 80, y: 102 }, pin: { x: 108, y: 128 }, scale: 0.95 },
     lines: {
       idle: '…hi. I live in the margin.',
       writing: 'I peeked. Your handwriting is kind.',
@@ -356,7 +358,7 @@ export const BUDDIES: BuddyDef[] = [
     blurb: 'A pocket dragon with opinions and a very small flame.',
     premium: true,
     perch: 'br',
-    anchors: { hat: { x: 78, y: 42 }, neck: { x: 80, y: 114 }, face: { x: 78, y: 74 }, pin: { x: 122, y: 118 } },
+    anchors: { hat: { x: 78, y: 46 }, neck: { x: 78, y: 100 }, face: { x: 78, y: 74 }, pin: { x: 104, y: 122 }, scale: 0.85 },
     lines: {
       idle: 'I am guarding the blank part.',
       writing: 'Tell me a treasure. A sentence counts.',
@@ -384,7 +386,7 @@ export const BUDDIES: BuddyDef[] = [
     blurb: 'A round unicorn who treats every page like a meadow.',
     premium: true,
     perch: 'br',
-    anchors: { hat: { x: 86, y: 34 }, neck: { x: 78, y: 108 }, face: { x: 84, y: 70 }, pin: { x: 120, y: 120 } },
+    anchors: { hat: { x: 98, y: 48 }, neck: { x: 98, y: 96 }, face: { x: 106, y: 72 }, pin: { x: 70, y: 124 }, scale: 0.8 },
     lines: {
       idle: 'The meadow is this page. Hop on.',
       writing: 'I braided a little luck into the line.',

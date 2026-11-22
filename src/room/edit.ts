@@ -6,6 +6,7 @@ export type PlacedItem = {
   x: number;
   y: number;
   flip: boolean;
+  z?: number;
   photo?: string | null;
   drawing?: string | null;
 };
@@ -17,12 +18,19 @@ export type PalRoom = {
   items: PlacedItem[];
 };
 
-export function clampSpot(value: number): number {
-  return Math.min(0.9, Math.max(0.1, value));
+export function clampSpot(value: number, loose = false): number {
+  const edge = loose ? 0.02 : 0.1;
+  return Math.min(1 - edge, Math.max(edge, value));
 }
 
 export function moveItem(room: PalRoom, id: string, x: number, y: number): PalRoom {
-  return { ...room, items: room.items.map((item) => (item.id === id ? { ...item, x: clampSpot(x), y: clampSpot(y) } : item)) };
+  const current = room.items.find((item) => item.id === id);
+  const loose = goodsById(current?.kind ?? '')?.kind === 'plush';
+  const top = room.items.reduce((max, item) => Math.max(max, item.z ?? 0), 0) + 1;
+  return {
+    ...room,
+    items: room.items.map((item) => (item.id === id ? { ...item, x: clampSpot(x, loose), y: clampSpot(y, loose), z: loose ? top : item.z } : item)),
+  };
 }
 
 export function flipItem(room: PalRoom, id: string): PalRoom {

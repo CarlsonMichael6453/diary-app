@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Image, PanResponder, Platform, Pressable, Text, View } from 'react-native';
+import { Animated, Image, PanResponder, Platform, Pressable, Text, View } from 'react-native';
 
 import { BuddyView } from '@/src/buddies/BuddyView';
 import { BUDDIES } from '@/src/buddies/catalog';
@@ -16,6 +16,7 @@ import { MOODS, type MoodId } from '@/src/data/moods';
 import { FURNITURE, PLUSHES, ROOM_THEMES, goodsById, themeById } from '@/src/room/catalog';
 import { buyGoods, buyTheme, defaultRoom, flipItem, moveItem, patchItem, placeItem, removeItem, seatFor, type PalRoom, type PlacedItem } from '@/src/room/edit';
 import { RoomBackdrop, RoomSprite, RoomSwatch } from '@/src/room/art';
+import { Plushie } from '@/src/room/plush';
 import { uid } from '@/src/logic/id';
 
 type Panel = 'room' | 'shop' | 'themes' | 'plush' | 'easel';
@@ -96,6 +97,7 @@ export default function PalRoomScreen() {
                 item={item}
                 decorate={decorate}
                 selected={selected === item.id}
+                ink={theme.colors.ink}
                 onSelect={() => {
                   setSelected(item.id);
                   if (!decorate && item.kind === 'easel') setPanel('easel');
@@ -134,7 +136,7 @@ export default function PalRoomScreen() {
             const owned = room.ownedKinds.includes(goods.id);
             return (
               <Pressable key={goods.id} accessibilityLabel={`${goods.name} preview`} onPress={() => { setNote(''); setPreviewId(goods.id); }} style={{ backgroundColor: theme.colors.card, borderRadius: 12, padding: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <RoomSprite kind={goods.id} size={64} />
+                <RoomSprite kind={goods.id} size={64} ink={theme.colors.ink} />
                 <View style={{ flex: 1 }}>
                   <Text style={{ color: theme.colors.ink, fontFamily: theme.body }}>{goods.name}</Text>
                   <Text style={{ color: theme.colors.ink, fontFamily: theme.body, fontSize: 13 }}>{owned ? 'Owned' : goods.premium ? 'Diary Plus' : goods.price ? `${goods.price} coins` : 'Free'}</Text>
@@ -166,7 +168,7 @@ export default function PalRoomScreen() {
             const buddy = BUDDIES.find((item) => `plush-${item.id}` === goods.id);
             return (
               <Pressable key={goods.id} accessibilityLabel={`${buddy?.name ?? goods.name} plush preview`} onPress={() => { setNote(''); setPreviewId(goods.id); }} style={{ width: '30%', backgroundColor: theme.colors.card, borderRadius: 12, padding: 8, alignItems: 'center' }}>
-                <BuddyView buddyId={buddy?.id ?? 'mochi'} outfits={[]} mood="happy" streak={1} writing finished entryCount={4} size={64} still />
+                <Plushie buddyId={buddy?.id ?? 'mochi'} size={72} ink={theme.colors.ink} />
                 <Text style={{ color: theme.colors.ink, fontFamily: theme.body, fontSize: 12 }}>{buddy?.name ?? goods.name}</Text>
                 <Text style={{ color: theme.colors.ink, fontFamily: theme.body, fontSize: 11 }}>{owned ? 'Owned' : `${goods.price} coins`}</Text>
               </Pressable>
@@ -294,7 +296,7 @@ function ShopPreview({
     >
       {look ? <RoomSwatch theme={look} width={260} height={170} /> : null}
       {goods?.kind === 'furniture' ? <RoomSprite kind={goods.id} size={160} /> : null}
-      {goods?.kind === 'plush' ? <BuddyView buddyId={buddy?.id ?? 'mochi'} outfits={[]} mood="happy" streak={2} writing finished entryCount={4} size={160} /> : null}
+      {goods?.kind === 'plush' ? <Plushie buddyId={buddy?.id ?? 'mochi'} size={160} /> : null}
     </ItemPreview>
   );
 }
@@ -303,23 +305,44 @@ function RoomThing({
   item,
   decorate,
   selected,
+  ink,
   onSelect,
   onMove,
 }: {
   item: PlacedItem;
   decorate: boolean;
   selected: boolean;
+  ink: string;
   onSelect: () => void;
   onMove: (x: number, y: number) => void;
 }) {
+  const plush = item.kind.startsWith('plush-');
+  const canDrag = useRef(false);
+  canDrag.current = decorate || plush;
+  const origin = useRef(item);
+  origin.current = item;
+  const dragOrigin = useRef(item);
+  const squish = useRef(new Animated.Value(0)).current;
+  function dropped() {
+    if (!plush) return;
+    squish.setValue(0);
+    Animated.sequence([
+      Animated.timing(squish, { toValue: 1, duration: 90, useNativeDriver: false }),
+      Animated.timing(squish, { toValue: 0, duration: 160, useNativeDriver: false }),
+    ]).start();
+  }
   const drag = useRef(PanResponder.create({
-    onStartShouldSetPanResponder: () => decorate,
-    onPanResponderGrant: () => onSelect(),
-    onPanResponderMove: (_, gesture) => {
-      onMove(item.x + gesture.dx / 320, item.y + gesture.dy / 420);
+    onStartShouldSetPanResponder: () => canDrag.current,
+    onPanResponderGrant: () => {
+      dragOrigin.current = origin.current;
+      onSelect();
     },
+    onPanResponderMove: (_, gesture) => {
+      onMove(dragOrigin.current.x + gesture.dx / 320, dragOrigin.current.y + gesture.dy / 420);
+    },
+    onPanResponderRelease: () => dropped(),
   })).current;
-  const webDrag = Platform.OS === 'web' && decorate
+  const webDrag = Platform.OS === 'web' && (decorate || plush)
     ? {
         onPointerDown: (event: { clientX: number; clientY: number; currentTarget: HTMLElement }) => {
           onSelect();
@@ -330,22 +353,27 @@ function RoomThing({
           const up = () => {
             window.removeEventListener('pointermove', move);
             window.removeEventListener('pointerup', up);
+            dropped();
           };
           window.addEventListener('pointermove', move);
           window.addEventListener('pointerup', up);
         },
       }
     : {};
+  const squashX = squish.interpolate({ inputRange: [0, 1], outputRange: [1, 1.16] });
+  const squashY = squish.interpolate({ inputRange: [0, 1], outputRange: [1, 0.84] });
   return (
-    <View
-      {...(decorate && Platform.OS !== 'web' ? drag.panHandlers : {})}
+    <Animated.View
+      {...(canDrag.current && Platform.OS !== 'web' ? drag.panHandlers : {})}
       {...(webDrag as object)}
-      style={{ position: 'absolute', left: `${item.x * 100}%`, top: `${item.y * 100}%`, marginLeft: -36, marginTop: -36, transform: [{ scaleX: item.flip ? -1 : 1 }], zIndex: selected ? 5 : 1, borderWidth: selected ? 2 : 0, borderColor: '#8C2F39', borderRadius: 8 }}
+      style={{ position: 'absolute', left: `${item.x * 100}%`, top: `${item.y * 100}%`, marginLeft: -36, marginTop: -40, zIndex: (item.z ?? 0) + 1, borderWidth: selected ? 2 : 0, borderColor: '#8C2F39', borderRadius: 8, transform: [{ scaleX: item.flip ? -1 : 1 }] }}
     >
-      <Pressable onPress={onSelect}>
-        <RoomSprite kind={item.kind} photo={item.photo} drawing={item.drawing} />
-        {item.kind === 'frame' && item.photo ? <Image source={{ uri: item.photo }} style={{ position: 'absolute', left: 14, top: 12, width: 44, height: 32, borderRadius: 2 }} /> : null}
-      </Pressable>
-    </View>
+      <Animated.View style={{ transform: [{ scaleX: squashX }, { scaleY: squashY }] }}>
+        <Pressable onPress={onSelect}>
+          <RoomSprite kind={item.kind} photo={item.photo} drawing={item.drawing} ink={ink} />
+          {item.kind === 'frame' && item.photo ? <Image source={{ uri: item.photo }} style={{ position: 'absolute', left: 14, top: 12, width: 44, height: 32, borderRadius: 2 }} /> : null}
+        </Pressable>
+      </Animated.View>
+    </Animated.View>
   );
 }

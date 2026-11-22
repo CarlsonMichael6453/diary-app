@@ -7,6 +7,7 @@ import { getBuddy } from '@/src/buddies/catalog';
 import { Paper } from '@/src/components/Paper';
 import { Screen } from '@/src/components/Screen';
 import { CoinPill } from '@/src/components/ui';
+import { BrowseFilter, NoMatch } from '@/src/components/BrowseFilter';
 import { VoiceMark } from '@/src/components/VoiceChip';
 import { getMood } from '@/src/data/moods';
 import { promptForDate } from '@/src/data/prompts';
@@ -17,6 +18,9 @@ import { inQuietHours, pickSaying } from '@/src/logic/sayings';
 import { pingPal } from '@/src/services/notifications';
 import { getPack } from '@/src/stickers/catalog';
 import { writingStreak } from '@/src/logic/streak';
+import { toggleFilterMood, toggleFilterTag, useBrowseFilter } from '@/src/logic/browseFilter';
+import { entryMatches, filterIsActive } from '@/src/logic/entryFilter';
+import { mergeTagCatalog } from '@/src/logic/tags';
 import { entriesOn, useDiary } from '@/src/store/useDiary';
 import { useTheme } from '@/src/theme/BookTheme';
 
@@ -37,9 +41,14 @@ export default function DiaryHome() {
   const saying = pickSaying(settings.lastSayingId, settings.buddyId);
   const prompt = promptForDate(today);
   const streak = writingStreak(visible.map((entry) => entry.date), today);
+  const filter = useBrowseFilter();
+  const filtering = filterIsActive(filter);
+  const matched = visible.filter((entry) => entryMatches(entry, filter));
+  const tagChoices = mergeTagCatalog(settings.savedTags, visible);
   const todayEntries = entriesOn(visible, today);
   const wroteToday = todayEntries.length > 0;
-  const earlier = [...visible].filter((entry) => entry.date !== today).sort((a, b) => b.date.localeCompare(a.date) || b.updatedAt - a.updatedAt);
+  const todayShown = entriesOn(matched, today);
+  const earlier = [...matched].filter((entry) => entry.date !== today).sort((a, b) => b.date.localeCompare(a.date) || b.updatedAt - a.updatedAt);
   const showNudge = settings.reminderEnabled && !wroteToday && settings.dismissedNudgeDate !== today;
 
   useEffect(() => {
@@ -151,38 +160,64 @@ export default function DiaryHome() {
         </Paper>
       </Pressable>
 
-      {todayEntries.length > 0 ? (
+      <View style={{ marginTop: 18, gap: 8 }}>
+        <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 24 }}>Pages</Text>
+        <BrowseFilter tags={tagChoices} />
+      </View>
+
+      {filtering && matched.length === 0 ? (
+        <View style={{ marginTop: 12 }}><NoMatch /></View>
+      ) : null}
+
+      {todayShown.length > 0 ? (
         <View style={{ marginTop: 18, gap: 10 }}>
           <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 24 }}>Written today</Text>
-          {todayEntries.map((entry) => (
-            <EntryRow key={entry.id} id={entry.id} title={entry.title} body={entry.body} mood={entry.mood} date={entry.date} voice={Boolean(entry.voiceNote)} />
+          {todayShown.map((entry) => (
+            <EntryRow key={entry.id} id={entry.id} title={entry.title} body={entry.body} mood={entry.mood} date={entry.date} tags={entry.tags} voice={Boolean(entry.voiceNote)} />
           ))}
         </View>
       ) : null}
 
+      {!filtering || earlier.length > 0 ? (
       <View style={{ marginTop: 18, gap: 10, marginBottom: 12 }}>
         <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 24 }}>Earlier pages</Text>
         {earlier.length === 0 ? (
           <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>Nothing earlier yet. The book starts whenever you do.</Text>
         ) : (
           earlier.map((entry) => (
-            <EntryRow key={entry.id} id={entry.id} title={entry.title} body={entry.body} mood={entry.mood} date={entry.date} voice={Boolean(entry.voiceNote)} />
+            <EntryRow key={entry.id} id={entry.id} title={entry.title} body={entry.body} mood={entry.mood} date={entry.date} tags={entry.tags} voice={Boolean(entry.voiceNote)} />
           ))
         )}
       </View>
+      ) : null}
     </Screen>
   );
 }
 
-function EntryRow({ id, title, body, mood, date, voice }: { id: string; title: string; body: string; mood: string; date: string; voice?: boolean }) {
+function EntryRow({ id, title, body, mood, date, tags, voice }: { id: string; title: string; body: string; mood: string; date: string; tags?: string[]; voice?: boolean }) {
   const theme = useTheme();
   const moodInfo = getMood(mood as 'calm');
   return (
     <Pressable onPress={() => router.push(`/entry/${id}` as Href)}>
       <View style={{ backgroundColor: theme.colors.card, borderRadius: theme.radius, padding: 14, borderLeftWidth: 6, borderLeftColor: moodInfo.color }}>
-        <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, fontSize: 12 }}>{formatPretty(date)} · {moodInfo.emoji} {moodInfo.label}{voice ? ' · ' : ''}{voice ? <VoiceMark /> : null}</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+          <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, fontSize: 12 }}>{formatPretty(date)} · </Text>
+          <Pressable accessibilityLabel={`Filter ${moodInfo.label}`} onPress={() => toggleFilterMood(mood)}>
+            <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, fontSize: 12 }}>{moodInfo.emoji} {moodInfo.label}</Text>
+          </Pressable>
+          {voice ? <VoiceMark /> : null}
+        </View>
         <Text style={{ color: theme.colors.ink, fontFamily: theme.script, fontSize: 24 }} numberOfLines={1}>{title || 'Untitled page'}</Text>
         <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }} numberOfLines={2}>{body}</Text>
+        {(tags ?? []).length > 0 ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+            {(tags ?? []).map((tag) => (
+              <Pressable key={tag} accessibilityLabel={`Filter tag ${tag}`} onPress={() => toggleFilterTag(tag)} style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: theme.colors.chip }}>
+                <Text style={{ color: theme.colors.chipInk, fontFamily: theme.body, fontSize: 12 }}>{tag}</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
       </View>
     </Pressable>
   );

@@ -43,19 +43,22 @@ export function ChoiceMenu({
   open,
   onToggle,
   children,
+  pinPage = true,
 }: {
   label: string;
   summary: ReactNode;
   open: boolean;
   onToggle: () => void;
   children: ReactNode;
+  /** Page menus hold the diary still. Browsing filters leave page turns alone. */
+  pinPage?: boolean;
 }) {
   const theme = useTheme();
   const host = useRef<any>(null);
   const list = useRef<any>(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !pinPage) return;
     const node = (host.current as HTMLElement | null) ?? null;
     const releaseMenu = Platform.OS === 'web' ? lockOpenMenu(node) : null;
     const releaseHold = retainPage();
@@ -63,7 +66,7 @@ export function ChoiceMenu({
       releaseHold();
       releaseMenu?.();
     };
-  }, [open]);
+  }, [open, pinPage]);
 
   useEffect(() => {
     const hostNode = host.current as HTMLElement | null;

@@ -45,7 +45,10 @@ export const FURNITURE: RoomGoods[] = [
   { id: 'catbed', name: 'Cat bed', price: 16, seat: true, kind: 'furniture' },
   { id: 'shelf', name: 'Wall shelf', price: 14, kind: 'furniture' },
   { id: 'poster', name: 'Poster', price: 10, kind: 'furniture' },
-  { id: 'frame', name: 'Picture frame', price: 18, kind: 'furniture' },
+  { id: 'frame', name: 'Wood frame', price: 18, kind: 'furniture' },
+  { id: 'frame-gold', name: 'Gold frame', price: 16, kind: 'furniture' },
+  { id: 'frame-pastel', name: 'Pastel frame', price: 12, kind: 'furniture' },
+  { id: 'frame-polaroid', name: 'Polaroid frame', price: 14, kind: 'furniture' },
   { id: 'easel', name: 'Drawing easel', price: 22, kind: 'furniture' },
   { id: 'cushion', name: 'Floor cushion', price: 8, kind: 'furniture' },
   { id: 'pumpkin', name: 'Seasonal pumpkin', price: 10, kind: 'furniture' },
@@ -61,4 +64,8 @@ export function themeById(id: string): RoomTheme {
 
 export function goodsById(id: string): RoomGoods | undefined {
   return [...FURNITURE, ...PLUSHES].find((item) => item.id === id);
+}
+
+export function isFrame(kind: string): boolean {
+  return kind === 'frame' || kind.startsWith('frame-');
 }

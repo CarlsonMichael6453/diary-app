@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Animated, Image, PanResponder, Platform, Pressable, Text, View } from 'react-native';
+import { Animated, PanResponder, Platform, Pressable, Text, View } from 'react-native';
 
 import { BuddyView } from '@/src/buddies/BuddyView';
 import { BUDDIES } from '@/src/buddies/catalog';
@@ -13,9 +13,9 @@ import { pickRoomPhoto } from '@/src/services/roomPhoto';
 import { useDiary } from '@/src/store/useDiary';
 import { useTheme } from '@/src/theme/BookTheme';
 import { MOODS, type MoodId } from '@/src/data/moods';
-import { FURNITURE, PLUSHES, ROOM_THEMES, goodsById, themeById } from '@/src/room/catalog';
-import { buyGoods, buyTheme, defaultRoom, flipItem, moveItem, patchItem, placeItem, removeItem, seatFor, type PalRoom, type PlacedItem } from '@/src/room/edit';
-import { RoomBackdrop, RoomSprite, RoomSwatch } from '@/src/room/art';
+import { FURNITURE, PLUSHES, ROOM_THEMES, goodsById, isFrame, themeById } from '@/src/room/catalog';
+import { buyGoods, buyTheme, defaultRoom, flipItem, moveItem, patchItem, placeItem, removeItem, resizeItem, seatFor, type PalRoom, type PlacedItem } from '@/src/room/edit';
+import { RoomBackdrop, RoomSprite, RoomSwatch, spriteBox } from '@/src/room/art';
 import { Plushie } from '@/src/room/plush';
 import { uid } from '@/src/logic/id';
 
@@ -100,11 +100,17 @@ export default function PalRoomScreen() {
                 ink={theme.colors.ink}
                 onSelect={() => {
                   setSelected(item.id);
-                  if (!decorate && item.kind === 'easel') setPanel('easel');
-                  if (!decorate && item.kind === 'frame') void choosePhoto(item);
-                  setEaselId(item.kind === 'easel' ? item.id : null);
+                  if (item.kind === 'easel') setEaselId(item.id);
+                }}
+                onOpen={() => {
+                  if (item.kind === 'easel') {
+                    setEaselId(item.id);
+                    setPanel('easel');
+                  }
+                  if (isFrame(item.kind)) void choosePhoto(item);
                 }}
                 onMove={(x, y) => save(moveItem(room, item.id, x, y))}
+                onResize={(scale) => save(resizeItem(room, item.id, scale))}
               />
             ))}
             <View pointerEvents="box-none" style={{ position: 'absolute', left: `${(seat?.x ?? 0.55) * 100}%`, top: `${(seat?.y ?? 0.58) * 100}%`, marginLeft: -36, marginTop: -40 }}>
@@ -119,12 +125,18 @@ export default function PalRoomScreen() {
               </Pressable>
             ))}
           </View>
+          {selected && isFrame(room.items.find((item) => item.id === selected)?.kind ?? '') ? (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+              <Button label="Smaller" tone="ghost" onPress={() => save(resizeItem(room, selected, (room.items.find((item) => item.id === selected)?.scale ?? 1) - 0.15))} />
+              <Button label="Bigger" tone="ghost" onPress={() => save(resizeItem(room, selected, (room.items.find((item) => item.id === selected)?.scale ?? 1) + 0.15))} />
+              <Button label="Change photo" tone="ghost" onPress={() => { const item = room.items.find((entry) => entry.id === selected); if (item) void choosePhoto(item); }} />
+              {room.items.find((item) => item.id === selected)?.photo ? <Button label="Clear photo" tone="ghost" onPress={() => save(patchItem(room, selected, { photo: null }))} /> : null}
+            </View>
+          ) : null}
           {decorate && selected ? (
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
               <Button label="Flip" tone="ghost" onPress={() => save(flipItem(room, selected))} />
               <Button label="Remove" tone="danger" onPress={() => { save(removeItem(room, selected)); setSelected(null); }} />
-              {room.items.find((item) => item.id === selected)?.kind === 'frame' ? <Button label="Change photo" tone="ghost" onPress={() => { const item = room.items.find((entry) => entry.id === selected); if (item) void choosePhoto(item); }} /> : null}
-              {room.items.find((item) => item.id === selected)?.kind === 'frame' && room.items.find((item) => item.id === selected)?.photo ? <Button label="Clear photo" tone="ghost" onPress={() => save(patchItem(room, selected, { photo: null }))} /> : null}
             </View>
           ) : null}
         </>
@@ -307,21 +319,28 @@ function RoomThing({
   selected,
   ink,
   onSelect,
+  onOpen,
   onMove,
+  onResize,
 }: {
   item: PlacedItem;
   decorate: boolean;
   selected: boolean;
   ink: string;
   onSelect: () => void;
+  onOpen: () => void;
   onMove: (x: number, y: number) => void;
+  onResize: (scale: number) => void;
 }) {
   const plush = item.kind.startsWith('plush-');
+  const frame = isFrame(item.kind);
   const canDrag = useRef(false);
-  canDrag.current = decorate || plush;
+  canDrag.current = decorate || plush || frame;
   const origin = useRef(item);
   origin.current = item;
   const dragOrigin = useRef(item);
+  const pinch = useRef<{ dist: number; scale: number } | null>(null);
+  const resizing = useRef(false);
   const squish = useRef(new Animated.Value(0)).current;
   function dropped() {
     if (!plush) return;
@@ -333,26 +352,45 @@ function RoomThing({
   }
   const drag = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => canDrag.current,
-    onPanResponderGrant: () => {
+    onPanResponderGrant: (event) => {
       dragOrigin.current = origin.current;
+      const touches = event.nativeEvent.touches ?? [];
+      pinch.current = touches.length >= 2 ? { dist: touchGap(touches), scale: origin.current.scale ?? 1 } : null;
       onSelect();
     },
-    onPanResponderMove: (_, gesture) => {
+    onPanResponderMove: (event, gesture) => {
+      const touches = event.nativeEvent.touches ?? [];
+      if (isFrame(origin.current.kind) && touches.length >= 2 && pinch.current && pinch.current.dist > 0) {
+        onResize(pinch.current.scale * (touchGap(touches) / pinch.current.dist));
+        return;
+      }
       onMove(dragOrigin.current.x + gesture.dx / 320, dragOrigin.current.y + gesture.dy / 420);
     },
-    onPanResponderRelease: () => dropped(),
+    onPanResponderRelease: (_, gesture) => {
+      dropped();
+      if (!decorate && origin.current.kind === 'easel' && Math.hypot(gesture.dx, gesture.dy) < 8) onOpen();
+    },
   })).current;
-  const webDrag = Platform.OS === 'web' && (decorate || plush)
+  const webDrag = Platform.OS === 'web' && (decorate || plush || frame)
     ? {
-        onPointerDown: (event: { clientX: number; clientY: number; currentTarget: HTMLElement }) => {
+        onPointerDown: (event: { clientX: number; clientY: number; currentTarget: HTMLElement; target: EventTarget | null }) => {
+          const target = event.target as HTMLElement | null;
+          if (resizing.current || target?.closest?.('[aria-label="Resize frame"]')) return;
           onSelect();
           const parent = event.currentTarget.parentElement;
           const rect = parent?.getBoundingClientRect();
           if (!rect) return;
-          const move = (ev: PointerEvent) => onMove((ev.clientX - rect.left) / rect.width, (ev.clientY - rect.top) / rect.height);
+          const startX = event.clientX;
+          const startY = event.clientY;
+          let dragged = false;
+          const move = (ev: PointerEvent) => {
+            if (Math.hypot(ev.clientX - startX, ev.clientY - startY) > 6) dragged = true;
+            if (dragged) onMove((ev.clientX - rect.left) / rect.width, (ev.clientY - rect.top) / rect.height);
+          };
           const up = () => {
             window.removeEventListener('pointermove', move);
             window.removeEventListener('pointerup', up);
+            if (!dragged && !decorate && origin.current.kind === 'easel') onOpen();
             dropped();
           };
           window.addEventListener('pointermove', move);
@@ -360,20 +398,45 @@ function RoomThing({
         },
       }
     : {};
+  const box = spriteBox(item.kind, item.scale ?? 1);
   const squashX = squish.interpolate({ inputRange: [0, 1], outputRange: [1, 1.16] });
   const squashY = squish.interpolate({ inputRange: [0, 1], outputRange: [1, 0.84] });
   return (
     <Animated.View
       {...(canDrag.current && Platform.OS !== 'web' ? drag.panHandlers : {})}
       {...(webDrag as object)}
-      style={{ position: 'absolute', left: `${item.x * 100}%`, top: `${item.y * 100}%`, marginLeft: -36, marginTop: -40, zIndex: (item.z ?? 0) + 1, borderWidth: selected ? 2 : 0, borderColor: '#8C2F39', borderRadius: 8, transform: [{ scaleX: item.flip ? -1 : 1 }] }}
+      style={{ position: 'absolute', left: `${item.x * 100}%`, top: `${item.y * 100}%`, marginLeft: -box.width / 2, marginTop: -box.height / 2, zIndex: (item.z ?? 0) + 1, borderWidth: selected ? 2 : 0, borderColor: '#8C2F39', borderRadius: 8, transform: [{ scaleX: item.flip ? -1 : 1 }] }}
     >
       <Animated.View style={{ transform: [{ scaleX: squashX }, { scaleY: squashY }] }}>
-        <Pressable onPress={onSelect}>
-          <RoomSprite kind={item.kind} photo={item.photo} drawing={item.drawing} ink={ink} />
-          {item.kind === 'frame' && item.photo ? <Image source={{ uri: item.photo }} style={{ position: 'absolute', left: 14, top: 12, width: 44, height: 32, borderRadius: 2 }} /> : null}
+        <Pressable accessibilityRole="button" accessibilityLabel={item.kind === 'easel' ? 'Open easel' : frame ? 'Picture frame' : item.kind} onPress={() => { if (!decorate && !frame && item.kind === 'easel') onOpen(); }}>
+          <RoomSprite kind={item.kind} photo={item.photo} drawing={item.drawing} ink={ink} width={box.width} />
         </Pressable>
+        {selected && frame ? (
+          <View
+            accessibilityLabel="Resize frame"
+            onPointerDown={(event: { nativeEvent: { pageX: number; pageY: number }; stopPropagation?: () => void }) => {
+              resizing.current = true;
+              event.stopPropagation?.();
+              const startX = event.nativeEvent.pageX;
+              const startScale = origin.current.scale ?? 1;
+              const move = (ev: PointerEvent) => onResize(startScale + (ev.clientX - startX) / 110);
+              const up = () => {
+                resizing.current = false;
+                window.removeEventListener('pointermove', move);
+                window.removeEventListener('pointerup', up);
+              };
+              window.addEventListener('pointermove', move);
+              window.addEventListener('pointerup', up);
+            }}
+            style={{ position: 'absolute', right: -6, bottom: -6, width: 22, height: 22, borderRadius: 6, backgroundColor: '#FFFDF8', borderWidth: 2, borderColor: '#8C2F39' }}
+          />
+        ) : null}
       </Animated.View>
     </Animated.View>
   );
+}
+
+function touchGap(touches: ReadonlyArray<{ pageX: number; pageY: number }>): number {
+  if (touches.length < 2) return 0;
+  return Math.hypot(touches[0].pageX - touches[1].pageX, touches[0].pageY - touches[1].pageY);
 }

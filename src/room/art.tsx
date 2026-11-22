@@ -1,47 +1,78 @@
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 import { View } from 'react-native';
-import Svg, { Circle, Ellipse, G, Path, Rect } from 'react-native-svg';
+import Svg, { Circle, ClipPath, Defs, Ellipse, G, Image as SvgImage, Path, Rect } from 'react-native-svg';
 
 import { strokesFrom } from '../logic/drawing';
-import type { RoomTheme } from './catalog';
+import { isFrame, type RoomTheme } from './catalog';
+import { fitDrawing } from './fitDrawing';
 import { Plushie } from './plush';
 
-function FrameArt({ photo }: { photo?: string | null }) {
+const EASEL_CANVAS = { x: 18, y: 16, w: 124, h: 108 };
+
+function EaselPicture({ drawing, width }: { drawing?: string | null; width: number }) {
+  const height = Math.round(width * (188 / 160));
+  const strokes = fitDrawing(strokesFrom(drawing), EASEL_CANVAS);
   return (
-    <G>
-      <Rect x={8} y={8} width={64} height={52} rx={4} fill="#F4E2C4" stroke="#8C5A3C" strokeWidth={4} />
-      <Rect x={14} y={14} width={52} height={36} fill={photo ? 'transparent' : '#C9E7F2'} />
-      {photo ? null : <Circle cx={40} cy={30} r={8} fill="#F6C445" />}
-    </G>
+    <Svg width={width} height={height} viewBox="0 0 160 188">
+      <Path d="M80 168 L28 36 H132 L80 168" fill="#E7C99A" stroke="#8C5A3C" strokeWidth={3} />
+      <Rect x={14} y={12} width={132} height={116} rx={2} fill="#FFFDF8" stroke="#8C5A3C" strokeWidth={4} />
+      {strokes.map((stroke, index) => (
+        <Path key={index} d={stroke.d} stroke={stroke.color} strokeWidth={stroke.width} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      ))}
+      <Path d="M46 150 L80 178 L114 150" stroke="#8C5A3C" strokeWidth={5} fill="none" strokeLinecap="round" />
+    </Svg>
   );
 }
 
-function EaselArt() {
+function FramePicture({ kind, photo, width }: { kind: string; photo?: string | null; width: number }) {
+  const clip = `frame${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
+  const height = Math.round(width * 0.88);
+  const pastel = kind === 'frame-pastel';
+  const polaroid = kind === 'frame-polaroid';
+  const gold = kind === 'frame-gold';
+  const opening = polaroid ? { x: 14, y: 10, w: 72, h: 48 } : { x: 16, y: 14, w: 68, h: 50 };
+  const border = gold ? '#C9A24D' : pastel ? '#F4A4B8' : polaroid ? '#E7D3C0' : '#8C5A3C';
+  const mat = gold ? '#F8E7B0' : pastel ? '#FFF0F6' : polaroid ? '#FFFDF8' : '#E7C99A';
   return (
-    <G>
-      <Path d="M40 70 L18 18 H62 L40 70" fill="#E7C99A" stroke="#8C5A3C" strokeWidth={2} />
-      <Path d="M22 22 H58 V48 H22 Z" fill="#FFFDF8" />
-      <Path d="M28 62 L40 78 L52 62" stroke="#8C5A3C" strokeWidth={3} fill="none" />
-    </G>
+    <Svg width={width} height={height} viewBox="0 0 100 88">
+      <Defs>
+        <ClipPath id={clip}>
+          <Rect x={opening.x} y={opening.y} width={opening.w} height={opening.h} />
+        </ClipPath>
+      </Defs>
+      <Rect x={4} y={4} width={92} height={80} rx={pastel ? 12 : 3} fill={mat} stroke={border} strokeWidth={gold ? 7 : polaroid ? 1.5 : 6} />
+      {gold ? <Rect x={12} y={10} width={76} height={64} fill="none" stroke="#FFF6D8" strokeWidth={2} /> : null}
+      {photo ? (
+        <G clipPath={`url(#${clip})`}>
+          <SvgImage href={photo} x={opening.x} y={opening.y} width={opening.w} height={opening.h} preserveAspectRatio="xMidYMid slice" />
+        </G>
+      ) : (
+        <G>
+          <Rect x={opening.x} y={opening.y} width={opening.w} height={opening.h} fill="#C9E7F2" />
+          <Circle cx={opening.x + opening.w * 0.35} cy={opening.y + opening.h * 0.4} r={8} fill="#F6C445" />
+        </G>
+      )}
+    </Svg>
   );
 }
 
-export function RoomSprite({ kind, photo, drawing, size = 72, ink }: { kind: string; photo?: string | null; drawing?: string | null; size?: number; ink?: string }) {
-  if (kind.startsWith('plush-')) return <Plushie buddyId={kind.slice(6)} size={size} ink={ink} />;
-  let body: ReactNode = <Circle cx={40} cy={40} r={12} fill="#F4A4B8" />;
-  if (kind === 'frame') body = <FrameArt photo={photo} />;
-  else if (kind === 'easel') {
-    const strokes = strokesFrom(drawing);
-    body = (
-      <G>
-        <EaselArt />
-        {strokes.map((stroke, index) => (
-          <Path key={index} d={polyPath(stroke.points)} stroke={stroke.color === 'eraser' ? 'transparent' : stroke.color} strokeWidth={stroke.size ?? 2} fill="none" />
-        ))}
-      </G>
-    );
-  } else body = spriteBody(kind);
-  return <Svg width={size} height={size} viewBox="0 0 80 80">{body}</Svg>;
+export function spriteBox(kind: string, scale = 1): { width: number; height: number } {
+  if (kind === 'easel') return { width: 176, height: Math.round(176 * (188 / 160)) };
+  if (isFrame(kind)) {
+    const width = Math.round(112 * scale);
+    return { width, height: Math.round(width * 0.88) };
+  }
+  if (kind.startsWith('plush-')) return { width: 72, height: Math.round(72 * (88 / 80)) };
+  return { width: 72, height: 72 };
+}
+
+export function RoomSprite({ kind, photo, drawing, size = 72, width, ink }: { kind: string; photo?: string | null; drawing?: string | null; size?: number; width?: number; ink?: string }) {
+  const spriteWidth = width ?? size;
+  if (kind.startsWith('plush-')) return <Plushie buddyId={kind.slice(6)} size={spriteWidth} ink={ink} />;
+  if (isFrame(kind)) return <FramePicture kind={kind} photo={photo} width={spriteWidth} />;
+  if (kind === 'easel') return <EaselPicture drawing={drawing} width={spriteWidth} />;
+  const body = spriteBody(kind);
+  return <Svg width={spriteWidth} height={spriteWidth} viewBox="0 0 80 80">{body}</Svg>;
 }
 
 export function RoomSwatch({ theme, width, height, night = false }: { theme: RoomTheme; width: number; height: number; night?: boolean }) {
@@ -123,11 +154,6 @@ function spriteBody(kind: string): ReactNode {
     pumpkin: <Ellipse cx={40} cy={40} rx={18} ry={14} fill="#FF8A00" />,
   };
   return art[kind] ?? <Circle cx={40} cy={40} r={12} fill="#F4A4B8" />;
-}
-
-function polyPath(points: string): string {
-  const pairs = points.trim().split(/\s+/);
-  return pairs.map((pair, index) => `${index === 0 ? 'M' : 'L'}${pair.replace(',', ' ')}`).join(' ');
 }
 
 export function RoomBackdrop({ wall, floor, trim, window, night }: { wall: string; floor: string; trim: string; window: string; night: boolean }) {

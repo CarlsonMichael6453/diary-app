@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { palMayRemember, palRecall } from '../src/logic/palMemory';
-import { buyGoods, buyTheme, clampSpot, defaultRoom, moveItem, placeItem } from '../src/room/edit';
+import { buyGoods, buyTheme, clampSpot, defaultRoom, moveItem, placeItem, resizeItem } from '../src/room/edit';
+import { fitDrawing } from '../src/room/fitDrawing';
 import { FURNITURE, goodsById } from '../src/room/catalog';
 
 describe('pal memories', () => {
@@ -59,5 +60,20 @@ describe('pal room', () => {
     assert.ok((sprout?.z ?? 0) > (plush?.z ?? 0));
     const bed = moveItem(room, 'placed-bed', 0, 0).items.find((item) => item.id === 'placed-bed');
     assert.equal(bed?.x, 0.1);
+  });
+
+  it('places another frame, resizes it, and fits a drawing into the easel canvas', () => {
+    const room = placeItem(defaultRoom(), 'frame-gold', 'second-frame');
+    assert.equal(room.items.filter((item) => item.kind === 'frame-gold').length, 2);
+    const grown = resizeItem(room, 'second-frame', 9);
+    const shrunk = resizeItem(room, 'second-frame', 0.1);
+    assert.equal(grown.items.find((item) => item.id === 'second-frame')?.scale, 2.2);
+    assert.equal(shrunk.items.find((item) => item.id === 'second-frame')?.scale, 0.65);
+    const high = moveItem(room, 'placed-frame', 0.4, 0);
+    assert.equal(high.items.find((item) => item.id === 'placed-frame')?.y, 0.02);
+    const fitted = fitDrawing([{ points: '0,0 100,40', color: '#E85D4C', size: 4 }], { x: 10, y: 10, w: 100, h: 80 });
+    assert.equal(fitted.length, 1);
+    assert.match(fitted[0].d, /^M/);
+    assert.ok(fitted[0].width > 1);
   });
 });

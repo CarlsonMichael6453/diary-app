@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { CURL_FOLD, curlLayout, foldAngle } from '../src/logic/curl';
-import { releaseCurl } from '../src/logic/swipe';
+import { cornerFold, releaseCorner, releaseCurl } from '../src/logic/swipe';
 
 describe('soft curl', () => {
   it('pins the fold to the finger with no dead zone', () => {
@@ -32,5 +32,16 @@ describe('soft curl', () => {
     assert.equal(releaseCurl('prev', 0.1, 300, false), 'commit');
     assert.equal(releaseCurl('next', 0.5, 300, false), 'commit');
     assert.equal(releaseCurl('next', 0.1, 0, false), 'cancel');
+  });
+
+  it('ignores a corner tap and commits a real inward fold', () => {
+    assert.equal(cornerFold(360, 20, 4, 2, 400, 640), null);
+    assert.equal(cornerFold(20, 600, -6, 4, 400, 640), null);
+    assert.equal(cornerFold(200, 40, -80, 4, 400, 640), null);
+    const fold = cornerFold(370, 30, -90, -20, 400, 640);
+    assert.equal(fold?.direction, 'next');
+    assert.equal(releaseCorner(fold?.inward ?? 0, 0, false), 'commit');
+    assert.equal(releaseCorner(40, 0, false), 'cancel');
+    assert.equal(releaseCorner(90, 0, true), 'cancel');
   });
 });

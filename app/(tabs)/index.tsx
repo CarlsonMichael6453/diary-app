@@ -22,6 +22,7 @@ import { writingStreak } from '@/src/logic/streak';
 import { toggleFilterMood, toggleFilterTag, useBrowseFilter } from '@/src/logic/browseFilter';
 import { entryMatches, filterIsActive } from '@/src/logic/entryFilter';
 import { mergeTagCatalog } from '@/src/logic/tags';
+import { pageOrdinalLabel } from '@/src/logic/bookPages';
 import { entriesOn, useDiary } from '@/src/store/useDiary';
 import { useTheme } from '@/src/theme/BookTheme';
 
@@ -175,7 +176,7 @@ export default function DiaryHome() {
         <View style={{ marginTop: 18, gap: 10 }}>
           <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 24 }}>Written today</Text>
           {todayShown.map((entry) => (
-            <EntryRow key={entry.id} id={entry.id} title={entry.title} body={entry.body} mood={entry.mood} date={entry.date} tags={entry.tags} voice={Boolean(entry.voiceNote)} />
+            <EntryRow key={entry.id} id={entry.id} title={entry.title} body={entry.body} mood={entry.mood} date={entry.date} tags={entry.tags} voice={Boolean(entry.voiceNote)} pageLabel={pageOrdinalLabel(visible, entry)} />
           ))}
         </View>
       ) : null}
@@ -187,7 +188,7 @@ export default function DiaryHome() {
           <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>Nothing earlier yet. The book starts whenever you do.</Text>
         ) : (
           earlier.map((entry) => (
-            <EntryRow key={entry.id} id={entry.id} title={entry.title} body={entry.body} mood={entry.mood} date={entry.date} tags={entry.tags} voice={Boolean(entry.voiceNote)} />
+            <EntryRow key={entry.id} id={entry.id} title={entry.title} body={entry.body} mood={entry.mood} date={entry.date} tags={entry.tags} voice={Boolean(entry.voiceNote)} pageLabel={pageOrdinalLabel(visible, entry)} />
           ))
         )}
       </View>
@@ -196,14 +197,14 @@ export default function DiaryHome() {
   );
 }
 
-function EntryRow({ id, title, body, mood, date, tags, voice }: { id: string; title: string; body: string; mood: string; date: string; tags?: string[]; voice?: boolean }) {
+function EntryRow({ id, title, body, mood, date, tags, voice, pageLabel }: { id: string; title: string; body: string; mood: string; date: string; tags?: string[]; voice?: boolean; pageLabel?: string | null }) {
   const theme = useTheme();
   const moodInfo = getMood(mood as 'calm');
   return (
     <Pressable onPress={() => router.push(`/entry/${id}` as Href)}>
       <View style={{ backgroundColor: theme.colors.card, borderRadius: theme.radius, padding: 14, borderLeftWidth: 6, borderLeftColor: moodInfo.color }}>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
-          <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, fontSize: 12 }}>{formatPretty(date)} · </Text>
+          <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, fontSize: 12 }}>{formatPretty(date)}{pageLabel ? ` · ${pageLabel}` : ''} · </Text>
           <Pressable accessibilityLabel={`Filter ${moodInfo.label}`} onPress={() => toggleFilterMood(mood)}>
             <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, fontSize: 12 }}>{moodInfo.emoji} {moodInfo.label}</Text>
           </Pressable>

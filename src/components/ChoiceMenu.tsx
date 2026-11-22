@@ -72,6 +72,7 @@ export function ChoiceMenu({
     const hostNode = host.current as HTMLElement | null;
     const node = list.current as HTMLElement | null;
     hostNode?.setAttribute?.('data-no-page-turn', '1');
+    hostNode?.setAttribute?.('data-page-section', '1');
     if (!node?.setAttribute) return;
     node.setAttribute('data-choice-list', '1');
     const stop = (event: Event) => event.stopPropagation();

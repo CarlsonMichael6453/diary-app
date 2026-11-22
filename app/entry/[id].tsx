@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams, type Href } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BackHandler, Platform, Pressable, ScrollView, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { BackHandler, PanResponder, Platform, Pressable, ScrollView, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BuddyView } from '@/src/buddies/BuddyView';
@@ -28,7 +28,7 @@ import { nextPrompt, promptForDate, visiblePrompt } from '@/src/data/prompts';
 import { canUseItem } from '@/src/logic/access';
 import { packIsListed } from '@/src/logic/packs';
 import { birthdayFrom, shopToday } from '@/src/logic/seasons';
-import { pageNeighbors, type PageStop } from '@/src/logic/bookPages';
+import { pageNeighbors, pageOrdinalLabel, type PageStop } from '@/src/logic/bookPages';
 import { formatLong, todayKey } from '@/src/logic/dates';
 import { uid } from '@/src/logic/id';
 import { countReviewEntries } from '@/src/logic/review';
@@ -76,10 +76,76 @@ type Draft = {
   weather?: string | null;
   prompt?: string | null;
   promptHidden?: boolean;
+  extraLines?: number;
 };
 
 function blank(date: string, bookId: string): Draft {
-  return { id: uid('page'), date, title: '', body: '', mood: 'calm', photos: [], photoPlacements: [], notes: [], textZ: 10, photoOnly: false, stickers: [], themeOverride: null, createdAt: Date.now(), bookId, tags: [], activities: [] };
+  return { id: uid('page'), date, title: '', body: '', mood: 'calm', photos: [], photoPlacements: [], notes: [], textZ: 10, photoOnly: false, stickers: [], themeOverride: null, createdAt: Date.now(), bookId, tags: [], activities: [], extraLines: 0 };
+}
+
+function markSection(node: unknown) {
+  (node as { setAttribute?: (name: string, value: string) => void } | null)?.setAttribute?.('data-page-section', '1');
+}
+
+const sectionTouch = Platform.OS === 'web'
+  ? {}
+  : {
+      onTouchStart: () => holdPage(true),
+      onTouchEnd: () => holdPage(false),
+      onTouchCancel: () => holdPage(false),
+    };
+
+type PageScroller = {
+  getScrollableNode?: () => { scrollTop: number };
+  scrollTo?: (opts: { y: number; animated?: boolean }) => void;
+};
+
+function scrollingNode(): { scrollTop: number } | null {
+  if (typeof document === 'undefined') return null;
+  const page = document.getElementById('diary-page');
+  let node = page?.parentElement ?? null;
+  while (node) {
+    const oy = getComputedStyle(node).overflowY;
+    if ((oy === 'auto' || oy === 'scroll') && node.scrollHeight > node.clientHeight + 4) return node;
+    node = node.parentElement;
+  }
+  return null;
+}
+
+function PageScrollRail({ scroller }: { scroller: { current: PageScroller | null } }) {
+  const start = useRef(0);
+  const pan = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderTerminationRequest: () => false,
+        onPanResponderGrant: () => {
+          start.current = scrollingNode()?.scrollTop ?? 0;
+        },
+        onPanResponderMove: (_, gesture) => {
+          const next = Math.max(0, start.current + gesture.dy);
+          const node = scrollingNode();
+          if (node) node.scrollTop = next;
+          else scroller.current?.scrollTo?.({ y: next, animated: false });
+        },
+      }),
+    [scroller],
+  );
+  return (
+    <View
+      {...pan.panHandlers}
+      accessibilityLabel="Scroll the page"
+      ref={(node) => {
+        const el = node as { setAttribute?: (name: string, value: string) => void } | null;
+        el?.setAttribute?.('data-scroll-rail', '1');
+        el?.setAttribute?.('data-no-page-turn', '1');
+      }}
+      style={{ position: 'absolute', right: 8, top: 72, bottom: 176, width: 28, zIndex: 240, alignItems: 'center', justifyContent: 'center' }}
+    >
+      <View pointerEvents="none" style={{ width: 12, height: 84, borderRadius: 8, backgroundColor: '#3A2A32', opacity: 0.55 }} />
+    </View>
+  );
 }
 
 function fromEntry(entry: DiaryEntry): Draft {
@@ -108,6 +174,7 @@ function fromEntry(entry: DiaryEntry): Draft {
     drawing: entry.drawing,
     prompt: entry.prompt,
     promptHidden: entry.promptHidden,
+    extraLines: entry.extraLines ?? 0,
     placeLabel: entry.placeLabel,
     weather: entry.weather,
   };
@@ -226,13 +293,57 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
     return () => window.removeEventListener('diary-draw-scroll', onScroll);
   }, []);
 
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    let held = false;
+    const sectionOf = (event: Event) => {
+      const node = event.target as Node | null;
+      const el = (node instanceof Element ? node : node?.parentElement) as Element | null;
+      if (!el?.closest || el.closest('[data-scroll-rail]')) return false;
+      return Boolean(el.closest('[data-page-section], input, textarea, [data-decoration], [data-drawing="1"]'));
+    };
+    const down = (event: PointerEvent) => {
+      if (!sectionOf(event) || held) return;
+      held = true;
+      holdPage(true);
+    };
+    const up = () => {
+      if (!held) return;
+      held = false;
+      holdPage(false);
+    };
+    const wheel = (event: WheelEvent) => {
+      if (!sectionOf(event)) return;
+      const node = event.target as Node | null;
+      const el = (node instanceof Element ? node : node?.parentElement) as Element | null;
+      if (el?.closest?.('[data-choice-list], [data-drawing="1"]')) return;
+      const field = el?.closest?.('textarea, input') as HTMLElement | null;
+      if (field && field.scrollHeight > field.clientHeight + 4) return;
+      event.preventDefault();
+    };
+    window.addEventListener('pointerdown', down, true);
+    window.addEventListener('pointerup', up, true);
+    window.addEventListener('pointercancel', up, true);
+    window.addEventListener('wheel', wheel, { capture: true, passive: false });
+    return () => {
+      if (held) holdPage(false);
+      window.removeEventListener('pointerdown', down, true);
+      window.removeEventListener('pointerup', up, true);
+      window.removeEventListener('pointercancel', up, true);
+      window.removeEventListener('wheel', wheel, true);
+    };
+  }, []);
+
   function rememberColor(next: string) {
     setPenColor(next);
     setRecentColors((colors) => [next, ...colors.filter((color) => color !== next)].slice(0, 6));
   }
   const scrollRef = useRef<{ getScrollableNode?: () => { style: CSSStyleDeclaration }; style?: CSSStyleDeclaration } | null>(null);
   const screen = useWindowDimensions();
-  const pageMin = Math.max(640, screen.height - insets.top - 132);
+  const ruled = (draft.extraLines ?? 0) * 28;
+  const pageMin = Math.max(640, screen.height - insets.top - 132) + ruled;
+  const bookPages = entries.filter((entry) => (entry.bookId ?? settings.activeBookId) === (draft.bookId ?? settings.activeBookId));
+  const dayPage = pageOrdinalLabel(bookPages, draft);
   const flipRef = useRef<PageFlipHandle>(null);
   const review = useReviewMoment();
   const promptsOn = settings.writingPrompts !== false;
@@ -243,6 +354,14 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
   const buddy = getBuddy(settings.buddyId);
   const perch = buddy?.perch ?? 'br';
   const saved = entries.some((entry) => entry.id === draft.id);
+
+  function openSibling() {
+    const bookId = draft.bookId ?? settings.activeBookId;
+    const sibling = blank(draft.date, bookId);
+    upsertEntry({ ...draft, updatedAt: Date.now(), sample: false });
+    upsertEntry({ ...sibling, updatedAt: Date.now() + 1, sample: false });
+    router.push(`/entry/${sibling.id}` as Href);
+  }
 
   const signature = useMemo(() => JSON.stringify(draft), [draft]);
   const skipFirstSave = useRef(true);
@@ -464,10 +583,10 @@ function updateSticker(next: StickerPlacement) {
             <View pointerEvents={decorate ? 'none' : 'auto'} style={[padding, { zIndex: 80, position: 'relative', paddingBottom: 0 }]}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Pressable accessibilityLabel="Previous page" onPress={() => turnPage(-1)}><Text style={{ color: theme.colors.paperInk, fontSize: 20 }}>‹</Text></Pressable>
-                <Text style={{ color: theme.colors.paperSoft, fontFamily: theme.body }}>{formatLong(draft.date)}</Text>
+                <Text style={{ color: theme.colors.paperSoft, fontFamily: theme.body }}>{formatLong(draft.date)}{dayPage ? ` · ${dayPage}` : ''}</Text>
                 <Pressable accessibilityLabel="Next page" onPress={() => turnPage(1)}><Text style={{ color: theme.colors.paperInk, fontSize: 20 }}>›</Text></Pressable>
               </View>
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start' }} {...({ dataSet: { noPageTurn: '1' } } as object)}>
+              <View ref={markSection} {...sectionTouch} style={{ flexDirection: 'row', alignItems: 'flex-start' }} {...({ dataSet: { noPageTurn: '1' } } as object)}>
                 {prompt ? <Text style={{ flex: 1, color: theme.colors.paperInk, fontFamily: theme.script, fontSize: 22, marginTop: 8 }}>{prompt}</Text> : <View style={{ flex: 1 }} />}
                 <FadeChrome hidden={deep}>
                   {promptsOn ? (
@@ -492,17 +611,19 @@ function updateSticker(next: StickerPlacement) {
               </View>
               <FadeChrome hidden={deep}>
                 <PalMemory />
-                <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start', marginTop: 8 }}>
+                <View ref={markSection} {...sectionTouch} style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start', marginTop: 8 }}>
                   <MoodPicker value={draft.mood} onChange={(mood) => setDraft({ ...draft, mood })} />
                   <TagMenu tags={draft.tags} activities={draft.activities} onChange={(patch) => setDraft({ ...draft, ...patch })} />
                 </View>
-                <EntryExtras isNew={!saved} draft={draft} onChange={(patch) => setDraft({ ...draft, ...patch })} />
+                <View ref={markSection} {...sectionTouch}>
+                  <EntryExtras isNew={!saved} draft={draft} onChange={(patch) => setDraft({ ...draft, ...patch })} />
+                </View>
               </FadeChrome>
               <LegacyDrawing value={draft.drawing} paper={theme.colors.paper} />
               {draft.photoOnly ? <Text style={{ color: theme.colors.paperSoft, fontFamily: theme.body, marginTop: 12 }}>Photo page</Text> : null}
             </View>
             {draft.photoOnly ? null : (
-              <View pointerEvents={decorate ? 'none' : 'auto'} style={{ zIndex: 12, position: 'relative', paddingLeft: padding.paddingLeft, paddingRight: padding.paddingRight, paddingBottom: padding.paddingBottom }}>
+              <View ref={markSection} {...sectionTouch} pointerEvents={decorate ? 'none' : 'auto'} style={{ zIndex: 12, position: 'relative', paddingLeft: padding.paddingLeft, paddingRight: padding.paddingRight, paddingBottom: 8 }}>
                 <TextInput
                   value={draft.title}
                   onChangeText={(title) => setDraft({ ...draft, title })}
@@ -522,10 +643,18 @@ function updateSticker(next: StickerPlacement) {
                   placeholderTextColor={theme.colors.paperSoft}
                   multiline
                   editable={!decorate}
-                  style={{ color: theme.colors.paperInk, fontFamily: theme.body, fontSize: 17, lineHeight: 28, minHeight: 220, textAlignVertical: 'top' }}
+                  style={{ color: theme.colors.paperInk, fontFamily: theme.body, fontSize: 17, lineHeight: 28, minHeight: 220 + ruled, textAlignVertical: 'top' }}
                 />
               </View>
             )}
+            <View ref={markSection} {...sectionTouch} pointerEvents="auto" style={{ zIndex: 46, flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingLeft: padding.paddingLeft, paddingRight: padding.paddingRight, paddingBottom: 16 }}>
+              <Pressable accessibilityLabel="Extend page" onPress={() => setDraft({ ...draft, extraLines: (draft.extraLines ?? 0) + 8 })} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: theme.colors.chip }}>
+                <Text style={{ color: theme.colors.chipInk, fontFamily: theme.body }}>Extend page</Text>
+              </Pressable>
+              <Pressable accessibilityLabel="New page for today" onPress={openSibling} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: theme.colors.chip }}>
+                <Text style={{ color: theme.colors.chipInk, fontFamily: theme.body }}>New page for today</Text>
+              </Pressable>
+            </View>
             <StickerLayer
               stickers={draft.stickers}
               width={pageSize.width}
@@ -596,6 +725,7 @@ function updateSticker(next: StickerPlacement) {
         </View>
         </PageFlip>
       </ScrollView>
+      {decorate ? <PageScrollRail scroller={scrollRef as never} /> : null}
 
       <FadeChrome hidden={deep}>
       {draft.voiceNote ? (

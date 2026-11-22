@@ -4,7 +4,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { decorationDrag, drawingLock, stripTouch } from '../logic/pageGesture';
-import { claimHorizontalSwipe, releaseCurl, verticalScrollWins } from '../logic/swipe';
+import { claimHorizontalSwipe, cornerFold, releaseCorner, releaseCurl, verticalScrollWins } from '../logic/swipe';
 import { playCurlCommit } from '../services/sounds';
 import { useTheme } from '../theme/BookTheme';
 import { useReduceMotion } from '../theme/useReduceMotion';
@@ -333,12 +333,8 @@ export const PageFlip = forwardRef<
 
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof window === 'undefined') return;
-    let drag: { x: number; y: number; left: number; top: number; active: boolean; vx: number; lastX: number; lastT: number; startT: number; field: HTMLElement | null } | null = null;
+    let drag: { x: number; y: number; left: number; top: number; active: boolean; vx: number; lastX: number; lastT: number; startT: number; field: HTMLElement | null; corner: boolean } | null = null;
     let settling = false;
-    const elementFrom = (event: Event) => {
-      const node = event.target as Node | null;
-      return (node instanceof Element ? node : node?.parentElement) as HTMLElement | null;
-    };
     const pageNode = () => {
       const nodes = [...document.querySelectorAll('#diary-page, [data-testid="diary-page"]')];
       return nodes.reverse().find((node) => {
@@ -357,15 +353,17 @@ export const PageFlip = forwardRef<
       if (!rect || clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) return;
       const field = target?.closest?.('input, textarea') as HTMLElement | null;
       if (field) prevent();
-      drag = { x: clientX, y: clientY, left: rect.left, top: rect.top, active: false, vx: 0, lastX: clientX, lastT: timeStamp, startT: timeStamp, field };
+      drag = { x: clientX, y: clientY, left: rect.left, top: rect.top, active: false, vx: 0, lastX: clientX, lastT: timeStamp, startT: timeStamp, field, corner: false };
     };
     const follow = (clientX: number, clientY: number, timeStamp: number) => {
       if (!drag || decorationDrag.value > 0 || stripTouch.value > 0) return;
       const dx = clientX - drag.x;
       const dy = clientY - drag.y;
       if (!drag.active) {
-        if (claimHorizontalSwipe(dx, dy, false)) {
+        const fold = cornerFold(drag.x - drag.left, drag.y - drag.top, dx, dy, width.value || 1, height.value || 1);
+        if (fold || claimHorizontalSwipe(dx, dy, false)) {
           drag.active = true;
+          drag.corner = Boolean(fold);
           drag.field = null;
           lock(true);
           document.body.style.userSelect = 'none';
@@ -599,16 +597,8 @@ export const PageFlip = forwardRef<
       if (!current || settling) return;
       const w = width.value || 1;
       if (!current.active) {
-        const localX = event.clientX - current.left;
-        const target = elementFrom(event);
-        const interactive = target?.closest?.('button, a, input, textarea, [data-no-page-turn], [data-decoration]');
         const tap = Math.abs(event.clientX - current.x) < 14 && Math.abs(event.clientY - current.y) < 14;
         if (tap && current.field) current.field.focus();
-        const zone = turnZone(event.clientY - current.top, height.value || 1);
-        if (!interactive && tap) {
-          if (localX > w * 0.82 && edgeRef.current.canNext) play('next', zone);
-          else if (localX < w * 0.18 && edgeRef.current.canPrev) play('prev', zone);
-        }
         return;
       }
       lock(false);
@@ -620,6 +610,12 @@ export const PageFlip = forwardRef<
       const direction = net <= 0 ? 'next' : 'prev';
       const reveal = Math.abs(net) / w;
       const blocked = direction === 'next' ? !edgeRef.current.canNext : !edgeRef.current.canPrev;
+      const fold = cornerFold(current.x - current.left, current.y - current.top, net, event.clientY - current.y, w, height.value || 1);
+      if (fold && releaseCorner(fold.inward, velocity, fold.direction === 'next' ? !edgeRef.current.canNext : !edgeRef.current.canPrev) === 'commit') {
+        play(fold.direction, turnZone(current.y - current.top, height.value || 1));
+        return;
+      }
+      if (current.corner) return;
       if (releaseCurl(direction, reveal, velocity, blocked) === 'commit') play(direction, turnZone(current.y - current.top, height.value || 1));
     };
     const fromTouch = (event: TouchEvent) => {

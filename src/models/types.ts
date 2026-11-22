@@ -77,6 +77,8 @@ export type DiaryEntry = {
   /** A prompt chosen for this page. Empty means the question for the date. */
   prompt?: string | null;
   promptHidden?: boolean;
+  /** Extra ruled lines added with Extend page. Each one is one line of writing. */
+  extraLines?: number;
   placeLabel?: string | null;
   weather?: string | null;
 };

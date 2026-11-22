@@ -14,6 +14,7 @@ import { entryMatches, filterIsActive } from '@/src/logic/entryFilter';
 import { mergeTagCatalog } from '@/src/logic/tags';
 import { entryBookId } from '@/src/logic/memories';
 import { playPageTurn } from '@/src/services/sounds';
+import { pageOrdinalLabel } from '@/src/logic/bookPages';
 import { entriesOn, useDiary } from '@/src/store/useDiary';
 import { useTheme } from '@/src/theme/BookTheme';
 
@@ -115,7 +116,7 @@ export default function CalendarScreen() {
           ) : (
             selectedEntries.map((entry) => (
               <Pressable key={entry.id} onPress={() => router.push(`/entry/${entry.id}` as Href)}>
-                <Text style={{ color: theme.colors.ink, fontFamily: theme.script, fontSize: 22 }}>{getMood(entry.mood).emoji} {entry.title || 'Untitled page'}{entry.voiceNote ? ' ' : ''}{entry.voiceNote ? <VoiceMark /> : null}</Text>
+                <Text style={{ color: theme.colors.ink, fontFamily: theme.script, fontSize: 22 }}>{getMood(entry.mood).emoji} {entry.title || 'Untitled page'}{pageOrdinalLabel(entries, entry) ? ` · ${pageOrdinalLabel(entries, entry)}` : ''}{entry.voiceNote ? ' ' : ''}{entry.voiceNote ? <VoiceMark /> : null}</Text>
                 <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }} numberOfLines={2}>{entry.body}</Text>
               </Pressable>
             ))

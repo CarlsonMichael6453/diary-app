@@ -347,7 +347,7 @@ function Editor({ draft, setDraft }: { draft: Draft; setDraft: (draft: Draft) =>
   }, [draft, entries, settings.activeBookId]);
 
   function pageNeedsSave(latest: Draft): boolean {
-  const content = latest.title.trim() || latest.body.trim() || latest.photos.length > 0 || latest.stickers.length > 0 || latest.photoPlacements.length > 0 || latest.notes.length > 0 || latest.photoOnly || latest.drawing || latest.voiceNote || latest.themeOverride || latest.design || latest.fontId || latest.inkColor || latest.prompt || latest.promptHidden;
+  const content = latest.title.trim() || latest.body.trim() || latest.photos.length > 0 || latest.stickers.length > 0 || latest.photoPlacements.length > 0 || latest.notes.length > 0 || latest.photoOnly || latest.drawing || latest.voiceNote || latest.themeOverride || latest.design || latest.fontId || latest.inkColor || latest.prompt || latest.promptHidden || (latest.tags?.length ?? 0) > 0 || (latest.activities?.length ?? 0) > 0;
   const stored = useDiary.getState().entries.find((entry) => entry.id === latest.id);
   const lookChanged = Boolean(stored) && ((stored?.themeOverride ?? null) !== (latest.themeOverride ?? null) || JSON.stringify(stored?.design ?? null) !== JSON.stringify(latest.design ?? null) || (stored?.fontId ?? null) !== (latest.fontId ?? null) || (stored?.inkColor ?? null) !== (latest.inkColor ?? null));
   return Boolean(content || lookChanged);

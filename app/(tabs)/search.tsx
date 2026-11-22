@@ -2,13 +2,17 @@ import { router, type Href } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
+import { BrowseFilter, NoMatch } from '@/src/components/BrowseFilter';
 import { Highlight } from '@/src/components/Highlight';
 import { VoiceMark } from '@/src/components/VoiceChip';
 import { Screen } from '@/src/components/Screen';
 import { getMood } from '@/src/data/moods';
 import { formatPretty } from '@/src/logic/dates';
+import { useBrowseFilter } from '@/src/logic/browseFilter';
+import { entryMatches, filterIsActive } from '@/src/logic/entryFilter';
 import { entryBookId } from '@/src/logic/memories';
 import { snippetAround } from '@/src/logic/search';
+import { mergeTagCatalog } from '@/src/logic/tags';
 import { useDiary } from '@/src/store/useDiary';
 import { useTheme } from '@/src/theme/BookTheme';
 
@@ -17,16 +21,17 @@ export default function SearchScreen() {
   const entries = useDiary((state) => state.entries);
   const activeBookId = useDiary((state) => state.settings.activeBookId);
   const [query, setQuery] = useState('');
-  const [tag, setTag] = useState<string | null>(null);
+  const filter = useBrowseFilter();
+  const filtering = filterIsActive(filter);
   const needle = query.trim().toLowerCase();
-  const tags = useMemo(() => Array.from(new Set(entries.flatMap((entry) => entry.tags ?? []))).slice(0, 12), [entries]);
+  const inBook = useMemo(() => entries.filter((entry) => entryBookId(entry) === activeBookId), [entries, activeBookId]);
+  const tags = useMemo(() => mergeTagCatalog([], inBook), [inBook]);
   const results = useMemo(() => {
-    return entries
-      .filter((entry) => entryBookId(entry) === activeBookId)
-      .filter((entry) => (tag ? (entry.tags ?? []).includes(tag) : true))
+    return inBook
+      .filter((entry) => entryMatches(entry, filter))
       .filter((entry) => !needle || `${entry.title}\n${entry.body}\n${(entry.tags ?? []).join(' ')}`.toLowerCase().includes(needle))
       .sort((a, b) => b.date.localeCompare(a.date));
-  }, [activeBookId, entries, needle, tag]);
+  }, [inBook, filter, needle]);
 
   return (
     <Screen>
@@ -51,16 +56,13 @@ export default function SearchScreen() {
           minHeight: 48,
         }}
       />
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
-        <Pressable onPress={() => setTag(null)}><Text style={{ color: tag ? theme.colors.inkSoft : theme.colors.accent, fontFamily: theme.body }}>All tags</Text></Pressable>
-        {tags.map((item) => (
-          <Pressable key={item} onPress={() => setTag(item)}><Text style={{ color: tag === item ? theme.colors.accent : theme.colors.ink, fontFamily: theme.body }}>{item}</Text></Pressable>
-        ))}
+      <View style={{ marginTop: 10 }}>
+        <BrowseFilter tags={tags} />
       </View>
-      {!needle && !tag ? (
+      {!needle && !filtering ? (
         <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, marginTop: 18 }}>Type any word and every page that contains it will show up, with the match marked.</Text>
       ) : results.length === 0 ? (
-        <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, marginTop: 18 }}>No pages mention that yet.</Text>
+        <View style={{ marginTop: 18 }}>{filtering ? <NoMatch /> : <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>No pages mention that yet.</Text>}</View>
       ) : (
         <View style={{ marginTop: 16, gap: 10 }}>
           <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>{results.length} {results.length === 1 ? 'page' : 'pages'}</Text>

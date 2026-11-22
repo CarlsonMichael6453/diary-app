@@ -8,6 +8,10 @@ import { Button } from '@/src/components/ui';
 import { getMood } from '@/src/data/moods';
 import { formatPretty, monthLabel, todayKey } from '@/src/logic/dates';
 import type { DiaryEntry } from '@/src/models/types';
+import { BrowseFilter, NoMatch } from '@/src/components/BrowseFilter';
+import { useBrowseFilter } from '@/src/logic/browseFilter';
+import { entryMatches, filterIsActive } from '@/src/logic/entryFilter';
+import { mergeTagCatalog } from '@/src/logic/tags';
 import { entryBookId } from '@/src/logic/memories';
 import { playPageTurn } from '@/src/services/sounds';
 import { entriesOn, useDiary } from '@/src/store/useDiary';
@@ -20,6 +24,9 @@ export default function CalendarScreen() {
   const allEntries = useDiary((state) => state.entries);
   const activeBookId = useDiary((state) => state.settings.activeBookId);
   const entries = allEntries.filter((entry) => entryBookId(entry) === activeBookId);
+  const filter = useBrowseFilter();
+  const filtering = filterIsActive(filter);
+  const tagChoices = mergeTagCatalog([], entries);
   const today = todayKey();
   const initial = new Date();
   const [cursor, setCursor] = useState({ year: initial.getFullYear(), month: initial.getMonth() });
@@ -38,7 +45,7 @@ export default function CalendarScreen() {
   const firstWeekday = new Date(cursor.year, cursor.month, 1).getDay();
   const daysInMonth = new Date(cursor.year, cursor.month + 1, 0).getDate();
   const cells: Array<number | null> = [...Array(firstWeekday).fill(null), ...Array.from({ length: daysInMonth }, (_, index) => index + 1)];
-  const selectedEntries = selected ? entriesOn(entries, selected) : [];
+  const selectedEntries = selected ? entriesOn(entries, selected).filter((entry) => entryMatches(entry, filter)) : [];
 
   function shift(delta: number) {
     playPageTurn();
@@ -50,7 +57,10 @@ export default function CalendarScreen() {
   return (
     <Screen>
       <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 36 }}>Calendar</Text>
-      <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, marginBottom: 12 }}>Days with pages take on that day’s mood color.</Text>
+      <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, marginBottom: 8 }}>Days with pages take on that day’s mood color.</Text>
+      <View style={{ marginBottom: 12 }}>
+        <BrowseFilter tags={tagChoices} />
+      </View>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
         <Pressable onPress={() => shift(-1)} accessibilityLabel="Previous month"><Text style={{ color: theme.colors.accent, fontSize: 22, fontFamily: theme.body }}>‹</Text></Pressable>
         <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 24 }}>{monthLabel(cursor.year, cursor.month)}</Text>
@@ -66,11 +76,13 @@ export default function CalendarScreen() {
           if (!day) return <View key={`e${index}`} style={{ width: '14.28%', aspectRatio: 1 }} />;
           const key = `${cursor.year}-${String(cursor.month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
           const dayEntries = byDate.get(key) ?? [];
-          const mood = dayEntries[0] ? getMood(dayEntries[0].mood) : null;
+          const matching = dayEntries.filter((entry) => entryMatches(entry, filter));
+          const dimmed = filtering && dayEntries.length > 0 && matching.length === 0;
+          const mood = matching[0] ? getMood(matching[0].mood) : null;
           const isToday = key === today;
           const isSelected = key === selected;
           return (
-            <Pressable key={key} onPress={() => setSelected(key)} style={{ width: '14.28%', aspectRatio: 1, padding: 3 }}>
+            <Pressable key={key} onPress={() => setSelected(key)} style={{ width: '14.28%', aspectRatio: 1, padding: 3, opacity: dimmed ? 0.35 : 1 }}>
               <View
                 style={{
                   flex: 1,
@@ -94,10 +106,12 @@ export default function CalendarScreen() {
         <View style={{ marginTop: 16, backgroundColor: theme.colors.card, borderRadius: theme.radius, padding: 14, gap: 10 }}>
           <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 26 }}>{formatPretty(selected)}</Text>
           {selectedEntries.length === 0 ? (
+            filtering && (byDate.get(selected) ?? []).length > 0 ? <NoMatch /> : (
             <>
               <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>This day is blank.</Text>
               <Button label="Write this day" onPress={() => router.push(`/entry/new?date=${selected}` as Href)} />
             </>
+            )
           ) : (
             selectedEntries.map((entry) => (
               <Pressable key={entry.id} onPress={() => router.push(`/entry/${entry.id}` as Href)}>

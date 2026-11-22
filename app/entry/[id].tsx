@@ -4,6 +4,7 @@ import { BackHandler, Platform, Pressable, ScrollView, Text, TextInput, useWindo
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BuddyView } from '@/src/buddies/BuddyView';
+import { PalMemory } from '@/src/components/PalMemory';
 import { getBuddy } from '@/src/buddies/catalog';
 import { DrawingSurface, DrawingToolbar, LegacyDrawing, PencilIcon } from '@/src/components/DrawingPad';
 import { VoicePlayer } from '@/src/components/VoicePlayer';
@@ -490,6 +491,7 @@ function updateSticker(next: StickerPlacement) {
                 </FadeChrome>
               </View>
               <FadeChrome hidden={deep}>
+                <PalMemory />
                 <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start', marginTop: 8 }}>
                   <MoodPicker value={draft.mood} onChange={(mood) => setDraft({ ...draft, mood })} />
                   <TagMenu tags={draft.tags} activities={draft.activities} onChange={(patch) => setDraft({ ...draft, ...patch })} />

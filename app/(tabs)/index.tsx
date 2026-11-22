@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { BuddyView } from '@/src/buddies/BuddyView';
+import { PalMemory } from '@/src/components/PalMemory';
 import { getBuddy } from '@/src/buddies/catalog';
 import { Paper } from '@/src/components/Paper';
 import { Screen } from '@/src/components/Screen';
@@ -128,6 +129,7 @@ export default function DiaryHome() {
           taps
           onPress={() => router.push('/buddies' as Href)}
         />
+        <PalMemory />
       </View>
 
       {showNudge ? (

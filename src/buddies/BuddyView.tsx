@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Ellipse, G, Line, Path, Polygon, Rect, Text as SvgText } from 'react-native-svg';
 
@@ -18,6 +18,8 @@ import {
 
 type DrawProps = BuddyContext & { anchors: BuddyDef['anchors']; outfits: string[] };
 
+const MotionCtx = createContext({ blink: false });
+
 function Face({
   cx,
   cy,
@@ -33,37 +35,48 @@ function Face({
   looking?: number;
   sleepy?: boolean;
 }) {
-  const gap = 12 * scale;
-  const y = cy - 1 * scale;
+  const { blink } = useContext(MotionCtx);
+  const gap = 14 * scale;
+  const y = cy - 2 * scale;
   const lx = cx - gap + looking;
   const rx = cx + gap + looking;
   const ink = '#3A2A32';
   const blush = mood === 'angry' ? '#E07A72' : '#F4A4B8';
-  const showBlush = mood === 'happy' || mood === 'loved' || mood === 'grateful' || mood === 'hopeful' || mood === 'calm';
-  const eye =
-    sleepy || mood === 'tired' ? (
-      <G>
-        <Path d={`M ${lx - 5} ${y} Q ${lx} ${y + 4} ${lx + 5} ${y}`} stroke={ink} strokeWidth={2} fill="none" />
-        <Path d={`M ${rx - 5} ${y} Q ${rx} ${y + 4} ${rx + 5} ${y}`} stroke={ink} strokeWidth={2} fill="none" />
-      </G>
-    ) : mood === 'grateful' ? (
-      <G>
-        <Path d={`M ${lx - 5} ${y + 1} Q ${lx} ${y - 4} ${lx + 5} ${y + 1}`} stroke={ink} strokeWidth={2} fill="none" />
-        <Path d={`M ${rx - 5} ${y + 1} Q ${rx} ${y - 4} ${rx + 5} ${y + 1}`} stroke={ink} strokeWidth={2} fill="none" />
-      </G>
-    ) : mood === 'loved' ? (
-      <G>
-        <Path d={`M ${lx} ${y + 3} C ${lx - 5} ${y - 3} ${lx - 2} ${y - 4} ${lx} ${y} C ${lx + 2} ${y - 4} ${lx + 5} ${y - 3} ${lx} ${y + 3}`} fill="#E85D78" />
-        <Path d={`M ${rx} ${y + 3} C ${rx - 5} ${y - 3} ${rx - 2} ${y - 4} ${rx} ${y} C ${rx + 2} ${y - 4} ${rx + 5} ${y - 3} ${rx} ${y + 3}`} fill="#E85D78" />
-      </G>
-    ) : (
-      <G>
-        <Circle cx={lx} cy={y} r={mood === 'excited' || mood === 'anxious' ? 3.4 * scale : 2.6 * scale} fill={ink} />
-        <Circle cx={rx} cy={y} r={mood === 'excited' || mood === 'anxious' ? 3.4 * scale : 2.6 * scale} fill={ink} />
-        <Circle cx={lx + 1} cy={y - 1} r={0.8} fill="#fff" />
-        <Circle cx={rx + 1} cy={y - 1} r={0.8} fill="#fff" />
-      </G>
-    );
+  const starry = mood === 'happy' || mood === 'excited' || mood === 'hopeful' || mood === 'fired';
+  const soft = sleepy || mood === 'tired' || mood === 'calm';
+  const radius = (mood === 'excited' || mood === 'anxious' || mood === 'fired' ? 6.6 : 5.6) * scale;
+  const eye = blink ? (
+    <G>
+      <Path d={`M ${lx - 8} ${y} Q ${lx} ${y + 1.5} ${lx + 8} ${y}`} stroke={ink} strokeWidth={2.2} fill="none" strokeLinecap="round" />
+      <Path d={`M ${rx - 8} ${y} Q ${rx} ${y + 1.5} ${rx + 8} ${y}`} stroke={ink} strokeWidth={2.2} fill="none" strokeLinecap="round" />
+    </G>
+  ) : soft ? (
+    <G>
+      <Path d={`M ${lx - 8} ${y} Q ${lx} ${y + 6} ${lx + 8} ${y}`} stroke={ink} strokeWidth={2.3} fill="none" strokeLinecap="round" />
+      <Path d={`M ${rx - 8} ${y} Q ${rx} ${y + 6} ${rx + 8} ${y}`} stroke={ink} strokeWidth={2.3} fill="none" strokeLinecap="round" />
+    </G>
+  ) : mood === 'grateful' || mood === 'loved' ? (
+    <G>
+      <Path d={`M ${lx} ${y + 5} C ${lx - 7} ${y - 5} ${lx - 2} ${y - 6} ${lx} ${y - 1} C ${lx + 2} ${y - 6} ${lx + 7} ${y - 5} ${lx} ${y + 5}`} fill="#E85D78" />
+      <Path d={`M ${rx} ${y + 5} C ${rx - 7} ${y - 5} ${rx - 2} ${y - 6} ${rx} ${y - 1} C ${rx + 2} ${y - 6} ${rx + 7} ${y - 5} ${rx} ${y + 5}`} fill="#E85D78" />
+      <Circle cx={lx - 2} cy={y - 2} r={1.3} fill="#fff" />
+      <Circle cx={rx - 2} cy={y - 2} r={1.3} fill="#fff" />
+    </G>
+  ) : starry ? (
+    <G>
+      <Polygon points={`${lx},${y - radius} ${lx + 1.8},${y - 1.4} ${lx + radius},${y} ${lx + 1.8},${y + 1.4} ${lx},${y + radius} ${lx - 1.8},${y + 1.4} ${lx - radius},${y} ${lx - 1.8},${y - 1.4}`} fill="#F6C445" />
+      <Polygon points={`${rx},${y - radius} ${rx + 1.8},${y - 1.4} ${rx + radius},${y} ${rx + 1.8},${y + 1.4} ${rx},${y + radius} ${rx - 1.8},${y + 1.4} ${rx - radius},${y} ${rx - 1.8},${y - 1.4}`} fill="#F6C445" />
+      <Circle cx={lx - 1.4} cy={y - 1.6} r={1.5} fill="#fff" />
+      <Circle cx={rx - 1.4} cy={y - 1.6} r={1.5} fill="#fff" />
+    </G>
+  ) : (
+    <G>
+      <Circle cx={lx} cy={y} r={radius} fill={ink} />
+      <Circle cx={rx} cy={y} r={radius} fill={ink} />
+      <Circle cx={lx - radius * 0.35} cy={y - radius * 0.38} r={1.8} fill="#fff" />
+      <Circle cx={rx - radius * 0.35} cy={y - radius * 0.38} r={1.8} fill="#fff" />
+    </G>
+  );
   const mouthY = cy + 10 * scale;
   const smile = mood === 'sad' || mood === 'angry';
   const mouth = mood === 'anxious' ? (
@@ -75,7 +88,7 @@ function Face({
       d={
         smile
           ? `M ${cx - 6} ${mouthY + 2} Q ${cx} ${mouthY - 4} ${cx + 6} ${mouthY + 2}`
-          : `M ${cx - 7} ${mouthY - 1} Q ${cx} ${mouthY + (mood === 'excited' ? 8 : 5)} ${cx + 7} ${mouthY - 1}`
+          : `M ${cx - 7} ${mouthY - 1} Q ${cx} ${mouthY + (mood === 'excited' || mood === 'fired' ? 8 : 5)} ${cx + 7} ${mouthY - 1}`
       }
       stroke={ink}
       strokeWidth={1.8}
@@ -92,12 +105,8 @@ function Face({
         </G>
       ) : null}
       {eye}
-      {showBlush ? (
-        <G>
-          <Ellipse cx={lx - 2} cy={y + 7} rx={4} ry={2} fill={blush} opacity={0.85} />
-          <Ellipse cx={rx + 2} cy={y + 7} rx={4} ry={2} fill={blush} opacity={0.85} />
-        </G>
-      ) : null}
+      <Ellipse cx={lx - 2} cy={y + 8} rx={4.5} ry={2.2} fill={blush} opacity={0.8} />
+      <Ellipse cx={rx + 2} cy={y + 8} rx={4.5} ry={2.2} fill={blush} opacity={0.8} />
       {mouth}
     </G>
   );
@@ -228,12 +237,17 @@ function drawOutfit(id: string, anchors: BuddyDef['anchors']) {
   return null;
 }
 
+function pencil(cx: number, cy: number, rx: number, ry: number, color: string) {
+  return <Ellipse cx={cx} cy={cy} rx={rx} ry={ry} fill={color} opacity={0.42} />;
+}
+
 function Mochi({ mood, writing, finished }: DrawProps) {
-  const napping = !writing && !finished;
+  const napping = mood === 'tired' && !writing && !finished;
   return (
     <G>
       <Ellipse cx={118} cy={128} rx={16} ry={10} fill="#F4A3B8" />
       <Ellipse cx={80} cy={124} rx={42} ry={32} fill="#F7C7B2" />
+      {pencil(80, 136, 20, 10, '#E8A88E')}
       <Ellipse cx={80} cy={132} rx={22} ry={14} fill="#FFE4D4" />
       <Path d="M48 58 L40 22 L62 48 Z" fill="#F7C7B2" />
       <Path d="M112 58 L120 22 L98 48 Z" fill="#F7C7B2" />
@@ -265,6 +279,7 @@ function Batsy({ mood }: DrawProps) {
       <Path d="M132 78 C140 50 112 46 90 70 C100 48 120 58 132 78 Z" fill="#3A3148" />
       <Ellipse cx={80} cy={86} rx={22} ry={26} fill="#2C2433" />
       <Circle cx={80} cy={112} r={20} fill="#3A3148" />
+      {pencil(80, 122, 10, 6, '#241C2A')}
       <Path d="M68 122 L74 138 L80 124 Z" fill="#2C2433" />
       <Path d="M92 122 L86 138 L80 124 Z" fill="#2C2433" />
       <Face cx={80} cy={112} mood={mood} scale={0.85} />
@@ -283,6 +298,7 @@ function Sprout({ mood, streak }: DrawProps) {
       {blooms === 0 ? <Ellipse cx={80} cy={138} rx={6} ry={8} fill="#7E9A6A" /> : null}
       <Rect x={70} y={108} width={20} height={36} rx={8} fill="#F7F1E1" />
       <Ellipse cx={80} cy={100} rx={40} ry={26} fill="#E36B6B" />
+      {pencil(80, 112, 16, 8, '#C45A5A')}
       <Circle cx={58} cy={92} r={5} fill="#F7E2C8" />
       <Circle cx={78} cy={84} r={4} fill="#F7E2C8" />
       <Circle cx={100} cy={94} r={4.5} fill="#F7E2C8" />
@@ -347,16 +363,54 @@ function Prism({ mood }: DrawProps) {
 }
 
 function doodle(mood: MoodId) {
-  if (mood === 'sad') return <Path d="M128 70 v10 M136 66 v16 M144 72 v8" stroke="#7A8CFF" strokeWidth={2} strokeLinecap="round" />;
-  if (mood === 'anxious') return <Path d="M124 80 q6 -8 12 0 t12 0" stroke="#C9A0DC" strokeWidth={2} fill="none" />;
-  if (mood === 'tired') return <SvgText x={126} y={78} fontSize={14} fill="#9AA0B4">z</SvgText>;
-  if (mood === 'angry') return <Path d="M126 70 l8 10 l8 -10 l8 10" stroke="#E85D4C" strokeWidth={2} fill="none" />;
-  if (mood === 'hopeful') return flower(136, 78, '#7DCE82', 5);
-  if (mood === 'loved' || mood === 'grateful' || mood === 'happy') {
-    return <Path d="M136 86 C128 74 146 74 136 96 C146 74 154 80 136 96" fill="#FF6B9A" />;
+  if (mood === 'sad') {
+    return (
+      <G>
+        <Path d="M118 48 q16 -16 32 0 q-6 10 -16 8 q-10 2 -16 -8" fill="#9BB0E8" opacity={0.9} />
+        <Path d="M126 58 v8 M134 56 v12 M142 58 v8" stroke="#7A8CFF" strokeWidth={2} strokeLinecap="round" />
+        <Path d="M48 132 Q80 118 112 132" stroke="#C9D4F2" strokeWidth={8} fill="none" strokeLinecap="round" />
+      </G>
+    );
   }
+  if (mood === 'anxious') return <Path d="M124 80 q6 -8 12 0 t12 0" stroke="#C9A0DC" strokeWidth={2} fill="none" />;
+  if (mood === 'tired') return <SvgText x={126} y={70} fontSize={16} fill="#9AA0B4">z z</SvgText>;
+  if (mood === 'angry') return <Path d="M126 70 l8 10 l8 -10 l8 10" stroke="#E85D4C" strokeWidth={2} fill="none" />;
+  if (mood === 'hopeful') return flower(136, 70, '#7DCE82', 6);
+  if (mood === 'fired') return <Path d="M132 88 C128 70 140 68 136 52 C142 68 152 70 144 88 C148 78 140 92 132 88 Z" fill="#FF5A36" />;
+  if (mood === 'happy' || mood === 'excited') {
+    return (
+      <G>
+        <Polygon points="30,48 32,54 38,54 33,58 35,64 30,60 25,64 27,58 22,54 28,54" fill="#F6C445" />
+        <Polygon points="132,40 134,46 140,46 135,50 137,56 132,52 127,56 129,50 124,46 130,46" fill="#F6C445" />
+      </G>
+    );
+  }
+  if (mood === 'loved' || mood === 'grateful') {
+    return (
+      <G>
+        <Path d="M128 78 C120 66 138 66 128 88 C138 66 146 72 128 88" fill="#FF6B9A" />
+        <Path d="M36 70 C30 62 42 62 36 76 C42 62 48 66 36 76" fill="#F4A4B8" />
+      </G>
+    );
+  }
+  if (mood === 'calm') return <Ellipse cx={136} cy={64} rx={10} ry={6} fill="#8ECAE6" opacity={0.7} />;
   return <Polygon points="136,64 140,74 150,74 142,80 146,90 136,84 126,90 130,80 122,74 132,74" fill="#F2C14E" />;
 }
+
+const SIGNATURES: Record<string, ReactNode> = {
+  mochi: <Circle cx={108} cy={128} r={5} fill="#F4A3B8" />,
+  batsy: <Path d="M108 40 l4 8 l8 1 l-6 5 l2 8 l-8 -4 l-8 4 l2 -8 l-6 -5 l8 -1 z" fill="#C9A24D" />,
+  sprout: <Ellipse cx={112} cy={48} rx={6} ry={3} fill="#7DCE82" />,
+  glitter: <Polygon points="118,36 120,42 126,42 121,46 123,52 118,48 113,52 115,46 110,42 116,42" fill="#F6C445" />,
+  prism: <Polygon points="116,50 122,62 110,62" fill="#8ECAE6" />,
+  inky: <Circle cx={118} cy={140} r={4} fill="#3A2A32" />,
+  pip: <Circle cx={48} cy={120} r={5} fill="#F6C445" />,
+  nova: <Circle cx={120} cy={40} r={4} fill="#F2C14E" />,
+  shelly: <Ellipse cx={40} cy={120} rx={8} ry={4} fill="#E7C99A" />,
+  ghosty: <Circle cx={112} cy={48} r={4} fill="#F4F1EA" />,
+  ember: <Path d="M118 50 C116 40 124 40 120 30 C124 40 130 42 124 52 Z" fill="#FF5A36" />,
+  lumi: <Circle cx={120} cy={46} r={4} fill="#FFF6D0" />,
+};
 
 function Inky({ mood }: DrawProps) {
   return (
@@ -377,6 +431,7 @@ function Pip({ mood, prompt }: DrawProps) {
   return (
     <G>
       <Ellipse cx={70} cy={118} rx={28} ry={22} fill="#FFE56A" />
+      {pencil(70, 128, 14, 8, '#F2C14E')}
       <Circle cx={74} cy={78} r={30} fill="#FFE56A" />
       <Ellipse cx={46} cy={100} rx={10} ry={7} fill="#F2C14E" />
       <Polygon points="86,84 108,92 86,98" fill="#FF8A5B" />
@@ -411,6 +466,7 @@ function Shelly({ mood }: DrawProps) {
   return (
     <G>
       <Path d="M36 78 Q36 36 80 36 Q124 36 124 78 Z" fill="#C9B6F2" opacity={0.85} />
+      {pencil(80, 70, 22, 8, '#B7A0E8')}
       <Ellipse cx={80} cy={78} rx={44} ry={10} fill="#E6DCFF" />
       <Path d="M52 80 Q48 112 44 128" stroke="#B7A0E8" strokeWidth={3} fill="none" />
       <Path d="M68 82 Q72 120 60 136" stroke="#8ECAE6" strokeWidth={3} fill="none" />
@@ -429,6 +485,7 @@ function Ghosty({ mood, entryCount }: DrawProps) {
   return (
     <G opacity={ghostyOpacity(entryCount)}>
       <Path d="M40 150 C40 70 120 64 120 150 L110 138 L96 154 L80 136 L64 154 L50 138 Z" fill="#F7F4FA" stroke="#E4D8EE" strokeWidth={2} />
+      {pencil(80, 118, 16, 8, '#E4D8EE')}
       {waving ? <Ellipse cx={126} cy={110} rx={10} ry={7} fill="#F7F4FA" transform="rotate(-30 126 110)" /> : null}
       <Face cx={80} cy={104} mood={shy ? 'calm' : mood} looking={shy ? -6 : 0} scale={0.95} />
     </G>
@@ -461,6 +518,7 @@ function Lumi({ mood }: DrawProps) {
       <Ellipse cx={78} cy={124} rx={34} ry={24} fill="#FFF8FC" />
       <Path d="M96 108 Q130 96 124 78 Q108 92 100 108 Z" fill="#FFE4F2" />
       <Circle cx={104} cy={72} r={24} fill="#FFFDF8" />
+      {pencil(104, 82, 10, 6, '#F4D5E4')}
       <Path d="M96 40 Q104 18 112 42 Q104 34 96 40 Z" fill="#F2C14E" />
       <Path d="M100 36 Q104 22 108 36" stroke="#E7B15A" strokeWidth={2} fill="none" />
       <Path d="M84 60 Q70 48 78 70" fill="#FF8FB8" />
@@ -496,6 +554,7 @@ export function BuddyView({
   layout = 'stack',
   taps = false,
   onPress,
+  wander = false,
   ...ctx
 }: BuddyContext & {
   buddyId: string;
@@ -505,11 +564,17 @@ export function BuddyView({
   layout?: 'stack' | 'row';
   taps?: boolean;
   onPress?: () => void;
+  wander?: boolean;
 }) {
   const theme = useTheme();
   const reduceMotion = useReduceMotion();
   const buddy = getBuddy(buddyId);
   const bob = useRef(new Animated.Value(0)).current;
+  const arrive = useRef(new Animated.Value(0.86)).current;
+  const bounce = useRef(new Animated.Value(0)).current;
+  const breath = useRef(new Animated.Value(0)).current;
+  const squish = useRef(new Animated.Value(0)).current;
+  const [blink, setBlink] = useState(false);
   const reaction = `${ctx.mood}|${ctx.celebrate ? 1 : 0}|${ctx.writing ? 1 : 0}|${ctx.finished ? 1 : 0}|${ctx.streak}`;
   const skipReaction = useRef(true);
   const lastMood = useRef(ctx.mood);
@@ -528,6 +593,50 @@ export function BuddyView({
   }, [bob, buddyId, reduceMotion]);
 
   useEffect(() => {
+    if (reduceMotion) {
+      arrive.setValue(1);
+      bounce.setValue(2);
+      return;
+    }
+    Animated.spring(arrive, { toValue: 1, friction: 5, tension: 80, useNativeDriver: false }).start();
+    Animated.sequence([
+      Animated.timing(bounce, { toValue: 1, duration: 140, easing: Easing.out(Easing.quad), useNativeDriver: false }),
+      Animated.spring(bounce, { toValue: 2, friction: 6, tension: 160, useNativeDriver: false }),
+    ]).start();
+    const breathe = Animated.loop(
+      Animated.sequence([
+        Animated.timing(breath, { toValue: 1, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+        Animated.timing(breath, { toValue: 0, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+      ]),
+    );
+    breathe.start();
+    let timer: ReturnType<typeof setTimeout>;
+    const wink = () => {
+      setBlink(true);
+      timer = setTimeout(() => {
+        setBlink(false);
+        timer = setTimeout(wink, 2600);
+      }, 140);
+    };
+    timer = setTimeout(wink, 1200);
+    return () => {
+      breathe.stop();
+      clearTimeout(timer);
+    };
+  }, [arrive, bounce, breath, reduceMotion]);
+
+  function squishTap() {
+    playBuddySound(buddyId);
+    onPress?.();
+    if (reduceMotion) return;
+    squish.setValue(0);
+    Animated.sequence([
+      Animated.timing(squish, { toValue: 1, duration: 90, useNativeDriver: false }),
+      Animated.timing(squish, { toValue: 0, duration: 180, easing: Easing.out(Easing.quad), useNativeDriver: false }),
+    ]).start();
+  }
+
+  useEffect(() => {
     if (skipReaction.current) {
       skipReaction.current = false;
       lastMood.current = ctx.mood;
@@ -544,21 +653,44 @@ export function BuddyView({
   const Draw = BUDDY_DRAW[buddy.id];
   const line = showLine ? buddyLine(buddy, ctx) : '';
   const drawProps: DrawProps = { ...ctx, anchors: buddy.anchors, outfits };
-  const transform =
+  const drift = wander ? [-22, 22] : buddy.id === 'shelly' ? [-18, 18] : [0, 0];
+  const bobTransform =
     buddy.id === 'batsy'
       ? [{ rotate: bob.interpolate({ inputRange: [0, 1], outputRange: ['-6deg', '6deg'] }) }]
-      : buddy.id === 'shelly'
-        ? [{ translateX: bob.interpolate({ inputRange: [0, 1], outputRange: [-18, 18] }) }]
+      : buddy.id === 'shelly' || wander
+        ? [{ translateX: bob.interpolate({ inputRange: [0, 1], outputRange: drift as [number, number] }) }]
         : [{ translateY: bob.interpolate({ inputRange: [0, 1], outputRange: [0, buddy.id === 'ghosty' ? -3 : -7] }) }];
+  const scale = Animated.multiply(arrive, breath.interpolate({ inputRange: [0, 1], outputRange: [1, reduceMotion ? 1 : 1.035] }));
+  const stretchX = bounce.interpolate({ inputRange: [0, 1, 2], outputRange: [1.16, 0.9, 1], extrapolate: 'clamp' });
+  const stretchY = bounce.interpolate({ inputRange: [0, 1, 2], outputRange: [0.82, 1.14, 1], extrapolate: 'clamp' });
+  const scaleX = Animated.multiply(Animated.multiply(scale, stretchX), squish.interpolate({ inputRange: [0, 1], outputRange: [1, 1.14] }));
+  const scaleY = Animated.multiply(Animated.multiply(scale, stretchY), squish.interpolate({ inputRange: [0, 1], outputRange: [1, 0.84] }));
+  const ink = theme.colors.ink;
 
   const art = (
-    <Animated.View style={{ transform }}>
-      <Svg width={size} height={size * (170 / 160)} viewBox="0 0 160 170">
-        <Outfits ids={outfits} anchors={buddy.anchors} behind />
-        {Draw ? <Draw {...drawProps} /> : <Circle cx={80} cy={90} r={30} fill={theme.colors.accent} />}
-        <Outfits ids={outfits} anchors={buddy.anchors} />
-      </Svg>
-    </Animated.View>
+    <MotionCtx.Provider value={{ blink }}>
+      <Animated.View style={{ transform: [{ scaleX }, { scaleY }] }}>
+        <Animated.View style={{ transform: bobTransform }}>
+          <Svg width={size} height={size * (170 / 160)} viewBox="0 0 160 170">
+            <Ellipse cx={80} cy={160} rx={48} ry={10} fill={ink} opacity={0.07} />
+            <Ellipse cx={80} cy={158} rx={36} ry={6.5} fill={ink} opacity={0.11} />
+            <Ellipse cx={80} cy={157} rx={22} ry={3.5} fill={ink} opacity={0.16} />
+            <Path d="M44 54 C30 66 24 96 36 124 C48 152 68 166 92 156 C122 170 150 140 140 104 C154 68 126 30 94 24 C66 16 52 34 44 54 Z" fill="#FFFFFF" />
+            <Path d="M44 54 C30 66 24 96 36 124 C48 152 68 166 92 156 C122 170 150 140 140 104 C154 68 126 30 94 24 C66 16 52 34 44 54 Z" fill="none" stroke="#FFFFFF" strokeWidth={6} strokeLinejoin="round" />
+            <Path d="M46 50 C28 68 26 98 40 126 C52 150 72 162 94 152 C118 164 146 134 136 100 C148 66 122 32 90 28 C64 20 54 36 46 50 Z" fill="none" stroke={ink} strokeWidth={1.35} strokeLinejoin="round" />
+            <Outfits ids={outfits} anchors={buddy.anchors} behind />
+            {Draw ? <Draw {...drawProps} /> : <Circle cx={80} cy={90} r={30} fill={theme.colors.accent} />}
+            <G opacity={0.09} stroke={ink} strokeWidth={0.7} fill="none">
+              <Path d="M58 78 H104 M50 104 H118 M66 128 H122" />
+              <Path d="M72 66 l7 5 M108 92 l6 -4" />
+            </G>
+            {SIGNATURES[buddy.id] ?? null}
+            <Outfits ids={outfits} anchors={buddy.anchors} />
+            {doodle(ctx.mood)}
+          </Svg>
+        </Animated.View>
+      </Animated.View>
+    </MotionCtx.Provider>
   );
 
   return (
@@ -572,10 +704,7 @@ export function BuddyView({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`${buddy.name}, play sound`}
-          onPress={() => {
-            playBuddySound(buddy.id);
-            onPress?.();
-          }}
+          onPress={squishTap}
         >
           {art}
         </Pressable>

@@ -142,6 +142,7 @@ export default function SettingsScreen() {
         {settings.buddyId === 'none' ? 'No pal on the page.' : `${getBuddy(settings.buddyId)?.name ?? 'Pal'} is sitting in the margin.`}
       </Text>
       <Button label="Choose a pal and wardrobe" onPress={() => router.push('/buddies' as Href)} />
+      <Button label="Visit their room" tone="ghost" onPress={() => router.push('/room' as Href)} />
 
       <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 26, marginTop: 18 }}>Daily reminder</Text>
       <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>

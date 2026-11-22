@@ -4,6 +4,7 @@ import Svg, { Circle, Ellipse, G, Path, Rect } from 'react-native-svg';
 
 import { strokesFrom } from '../logic/drawing';
 import type { RoomTheme } from './catalog';
+import { Plushie } from './plush';
 
 function FrameArt({ photo }: { photo?: string | null }) {
   return (
@@ -25,7 +26,8 @@ function EaselArt() {
   );
 }
 
-export function RoomSprite({ kind, photo, drawing, size = 72 }: { kind: string; photo?: string | null; drawing?: string | null; size?: number }) {
+export function RoomSprite({ kind, photo, drawing, size = 72, ink }: { kind: string; photo?: string | null; drawing?: string | null; size?: number; ink?: string }) {
+  if (kind.startsWith('plush-')) return <Plushie buddyId={kind.slice(6)} size={size} ink={ink} />;
   let body: ReactNode = <Circle cx={40} cy={40} r={12} fill="#F4A4B8" />;
   if (kind === 'frame') body = <FrameArt photo={photo} />;
   else if (kind === 'easel') {
@@ -36,15 +38,6 @@ export function RoomSprite({ kind, photo, drawing, size = 72 }: { kind: string; 
         {strokes.map((stroke, index) => (
           <Path key={index} d={polyPath(stroke.points)} stroke={stroke.color === 'eraser' ? 'transparent' : stroke.color} strokeWidth={stroke.size ?? 2} fill="none" />
         ))}
-      </G>
-    );
-  } else if (kind.startsWith('plush-')) {
-    body = (
-      <G>
-        <Ellipse cx={40} cy={58} rx={16} ry={6} fill="#000" opacity={0.12} />
-        <Circle cx={40} cy={40} r={16} fill="#F7C7B2" stroke="#3A2A32" strokeWidth={1.2} />
-        <Circle cx={34} cy={38} r={2} fill="#3A2A32" />
-        <Circle cx={46} cy={38} r={2} fill="#3A2A32" />
       </G>
     );
   } else body = spriteBody(kind);

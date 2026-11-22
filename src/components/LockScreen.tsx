@@ -93,6 +93,8 @@ export function LockOverlay() {
   const lockOnOpen = useDiary((state) => state.settings.lockOnOpen);
   const shakeToOpen = useDiary((state) => state.settings.shakeToOpen);
   const lockEnabled = useDiary((state) => state.settings.lockEnabled);
+  const biometricsEnabled = useDiary((state) => state.settings.biometricsEnabled);
+  const claspOn = lockEnabled || biometricsEnabled;
   const bookTitle = useDiary((state) => state.settings.bookTitle);
   const screen = useWindowDimensions();
   const coverWidth = Math.round(Math.min(screen.width - 48, (screen.height - 230) / 1.35, 300));
@@ -129,9 +131,9 @@ export function LockOverlay() {
         if (finished) finishOpen();
       });
     };
-    if (lockEnabled) {
+    if (claspOn) {
       setUnlatched(true);
-      setTimeout(swingOpen, 180);
+      setTimeout(swingOpen, reduceMotion ? 0 : 420);
       return;
     }
     swingOpen();
@@ -205,6 +207,18 @@ export function LockOverlay() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lockOnOpen, open]);
 
+  function pressClasp() {
+    if (unlatched) return;
+    const settings = useDiary.getState().settings;
+    if (bio && settings.biometricsEnabled) {
+      unlockWithBiometric().then((ok) => {
+        if (ok) openBook();
+      });
+      return;
+    }
+    if (!settings.lockEnabled) openBook();
+  }
+
   if (open) return null;
 
   const coverStyle = {
@@ -233,7 +247,7 @@ export function LockOverlay() {
       }
     >
       <Animated.View style={coverStyle}>
-        <BookCover title={bookTitle} theme={theme} width={coverWidth} locked={lockEnabled} unlatched={unlatched} />
+        <BookCover title={bookTitle} theme={theme} width={coverWidth} locked={claspOn} unlatched={unlatched} onUnlock={pressClasp} />
       </Animated.View>
       {lockOnOpen && lockEnabled ? (
         <View style={{ marginTop: 18, width: '100%' }}>

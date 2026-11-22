@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { palMayRemember, palRecall } from '../src/logic/palMemory';
-import { buyGoods, buyTheme, clampSpot, defaultRoom, moveItem } from '../src/room/edit';
+import { buyGoods, buyTheme, clampSpot, defaultRoom, moveItem, placeItem } from '../src/room/edit';
 import { FURNITURE, goodsById } from '../src/room/catalog';
 
 describe('pal memories', () => {
@@ -46,5 +46,18 @@ describe('pal room', () => {
     }
     const plus = buyTheme(room, 100, false, 'candy');
     assert.equal(plus.ok, false);
+  });
+
+  it('lets plushies overlap in a corner and keeps the dragged one in front', () => {
+    const room = placeItem(defaultRoom(), 'plush-mochi', 'pile');
+    const parked = moveItem(room, 'pile', 0, 1);
+    const plush = parked.items.find((item) => item.id === 'pile');
+    assert.equal(plush?.x, 0.02);
+    assert.equal(plush?.y, 0.98);
+    const again = moveItem(parked, 'placed-plush', 0.04, 0.9);
+    const sprout = again.items.find((item) => item.id === 'placed-plush');
+    assert.ok((sprout?.z ?? 0) > (plush?.z ?? 0));
+    const bed = moveItem(room, 'placed-bed', 0, 0).items.find((item) => item.id === 'placed-bed');
+    assert.equal(bed?.x, 0.1);
   });
 });

@@ -72,7 +72,19 @@ export default function PaywallScreen() {
         ))}
       </View>
       <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 26, marginTop: 8 }}>Animated styles</Text>
-      <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>{THEMES.filter((item) => item.premium).map((item) => item.name).join(', ')}</Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+        {THEMES.filter((item) => item.premium).map((item) => (
+          <View key={item.id} style={{ width: 86, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: item.colors.paperEdge, backgroundColor: item.colors.paper }}>
+            <View style={{ height: 54, backgroundColor: item.colors.bg, paddingLeft: 10, paddingTop: 8 }}>
+              <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 7, backgroundColor: item.colors.binding }} />
+              <View style={{ height: 7, width: 40, borderRadius: 4, backgroundColor: item.colors.accent, marginLeft: 6 }} />
+              <View style={{ height: 3, width: 46, borderRadius: 2, backgroundColor: item.colors.line, marginLeft: 6, marginTop: 6 }} />
+              <View style={{ height: 3, width: 28, borderRadius: 2, backgroundColor: item.colors.line, marginLeft: 6, marginTop: 4 }} />
+            </View>
+            <Text style={{ color: item.colors.paperInk, fontFamily: theme.body, fontSize: 11, padding: 6 }}>{item.name}</Text>
+          </View>
+        ))}
+      </View>
       <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 26, marginTop: 8 }}>Packs</Text>
       <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>Seasonal Plus packs show up in the shop during their holiday, then stay in your book.</Text>
       {premiumPacks.map((pack) => (

@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
+import { View } from 'react-native';
 import Svg, { Circle, Ellipse, G, Path, Rect } from 'react-native-svg';
 
 import { strokesFrom } from '../logic/drawing';
+import type { RoomTheme } from './catalog';
 
 function FrameArt({ photo }: { photo?: string | null }) {
   return (
@@ -23,7 +25,7 @@ function EaselArt() {
   );
 }
 
-export function RoomSprite({ kind, photo, drawing }: { kind: string; photo?: string | null; drawing?: string | null }) {
+export function RoomSprite({ kind, photo, drawing, size = 72 }: { kind: string; photo?: string | null; drawing?: string | null; size?: number }) {
   let body: ReactNode = <Circle cx={40} cy={40} r={12} fill="#F4A4B8" />;
   if (kind === 'frame') body = <FrameArt photo={photo} />;
   else if (kind === 'easel') {
@@ -46,7 +48,15 @@ export function RoomSprite({ kind, photo, drawing }: { kind: string; photo?: str
       </G>
     );
   } else body = spriteBody(kind);
-  return <Svg width={72} height={72} viewBox="0 0 80 80">{body}</Svg>;
+  return <Svg width={size} height={size} viewBox="0 0 80 80">{body}</Svg>;
+}
+
+export function RoomSwatch({ theme, width, height, night = false }: { theme: RoomTheme; width: number; height: number; night?: boolean }) {
+  return (
+    <View style={{ width, height, borderRadius: 10, overflow: 'hidden' }}>
+      <RoomBackdrop wall={theme.wall} floor={theme.floor} trim={theme.trim} window={theme.window} night={night} />
+    </View>
+  );
 }
 
 function spriteBody(kind: string): ReactNode {

@@ -5,6 +5,7 @@ import { Image, PanResponder, Platform, Pressable, Text, View } from 'react-nati
 import { BuddyView } from '@/src/buddies/BuddyView';
 import { BUDDIES } from '@/src/buddies/catalog';
 import { DrawingSurface } from '@/src/components/DrawingPad';
+import { ItemPreview } from '@/src/components/ItemPreview';
 import { Screen } from '@/src/components/Screen';
 import { Button, CoinPill } from '@/src/components/ui';
 import { strokesFrom } from '@/src/logic/drawing';
@@ -14,7 +15,7 @@ import { useTheme } from '@/src/theme/BookTheme';
 import { MOODS, type MoodId } from '@/src/data/moods';
 import { FURNITURE, PLUSHES, ROOM_THEMES, goodsById, themeById } from '@/src/room/catalog';
 import { buyGoods, buyTheme, defaultRoom, flipItem, moveItem, patchItem, placeItem, removeItem, seatFor, type PalRoom, type PlacedItem } from '@/src/room/edit';
-import { RoomBackdrop, RoomSprite } from '@/src/room/art';
+import { RoomBackdrop, RoomSprite, RoomSwatch } from '@/src/room/art';
 import { uid } from '@/src/logic/id';
 
 type Panel = 'room' | 'shop' | 'themes' | 'plush' | 'easel';
@@ -33,6 +34,7 @@ export default function PalRoomScreen() {
   const [pen, setPen] = useState('#E85D4C');
   const latestMood = [...entries].sort((a, b) => b.date.localeCompare(a.date))[0]?.mood ?? 'happy';
   const [mood, setMood] = useState<MoodId>(latestMood);
+  const [previewId, setPreviewId] = useState<string | null>(null);
   const box = useRef({ width: 320, height: 420 });
   const look = themeById(room.themeId);
   const night = new Date().getHours() >= 19 || new Date().getHours() < 6;
@@ -48,21 +50,15 @@ export default function PalRoomScreen() {
 
   function buy(id: string) {
     const goods = goodsById(id);
-    if (!goods) return;
+    if (!goods) return false;
     const result = buyGoods(room, wallet.coins, wallet.premium, goods);
     setNote(result.message);
     if (!result.ok) {
       if (result.message.includes('Diary Plus')) router.push('/paywall');
-      return;
+      return false;
     }
     save(result.room, result.coins);
-  }
-
-  function useThemeChoice(id: string) {
-    const result = buyTheme(room, wallet.coins, wallet.premium, id);
-    setNote(result.message);
-    if (!result.ok && result.message.includes('Diary Plus')) router.push('/paywall');
-    if (result.ok) save(result.room, result.coins);
+    return true;
   }
 
   async function choosePhoto(item: PlacedItem) {
@@ -137,13 +133,13 @@ export default function PalRoomScreen() {
           {FURNITURE.map((goods) => {
             const owned = room.ownedKinds.includes(goods.id);
             return (
-              <View key={goods.id} style={{ backgroundColor: theme.colors.card, borderRadius: 12, padding: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <RoomSprite kind={goods.id} />
+              <Pressable key={goods.id} accessibilityLabel={`${goods.name} preview`} onPress={() => { setNote(''); setPreviewId(goods.id); }} style={{ backgroundColor: theme.colors.card, borderRadius: 12, padding: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <RoomSprite kind={goods.id} size={64} />
+                <View style={{ flex: 1 }}>
                   <Text style={{ color: theme.colors.ink, fontFamily: theme.body }}>{goods.name}</Text>
+                  <Text style={{ color: theme.colors.ink, fontFamily: theme.body, fontSize: 13 }}>{owned ? 'Owned' : goods.premium ? 'Diary Plus' : goods.price ? `${goods.price} coins` : 'Free'}</Text>
                 </View>
-                {owned ? <Button label="Place" tone="ghost" onPress={() => { save(placeItem(room, goods.id, uid('room'))); setPanel('room'); setDecorate(true); }} /> : <Button label={goods.price ? `${goods.price} coins` : 'Free'} onPress={() => buy(goods.id)} />}
-              </View>
+              </Pressable>
             );
           })}
         </View>
@@ -152,9 +148,12 @@ export default function PalRoomScreen() {
       {panel === 'themes' ? (
         <View style={{ gap: 8, marginTop: 8 }}>
           {ROOM_THEMES.map((item) => (
-            <Pressable key={item.id} onPress={() => useThemeChoice(item.id)} style={{ backgroundColor: item.wall, borderRadius: 14, padding: 12, borderWidth: room.themeId === item.id ? 3 : 0, borderColor: theme.colors.accent }}>
-              <Text style={{ color: item.id === 'starry' ? '#FFF6D8' : '#3A2A32', fontFamily: theme.display, fontSize: 22 }}>{item.name}</Text>
-              <Text style={{ color: item.id === 'starry' ? '#FFF6D8' : '#3A2A32', fontFamily: theme.body }}>{room.ownedThemes.includes(item.id) ? 'Owned' : item.premium ? 'Diary Plus' : item.price ? `${item.price} coins` : 'Free'}</Text>
+            <Pressable key={item.id} accessibilityLabel={`${item.name} preview`} onPress={() => { setNote(''); setPreviewId(item.id); }} style={{ backgroundColor: theme.colors.card, borderRadius: 14, padding: 8, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: room.themeId === item.id ? 3 : 0, borderColor: theme.colors.accent }}>
+              <RoomSwatch theme={item} width={96} height={68} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 22 }}>{item.name}</Text>
+                <Text style={{ color: theme.colors.ink, fontFamily: theme.body }}>{room.ownedThemes.includes(item.id) ? (room.themeId === item.id ? 'In use' : 'Owned') : item.premium ? 'Diary Plus' : item.price ? `${item.price} coins` : 'Free'}</Text>
+              </View>
             </Pressable>
           ))}
         </View>
@@ -166,10 +165,10 @@ export default function PalRoomScreen() {
             const owned = room.ownedKinds.includes(goods.id);
             const buddy = BUDDIES.find((item) => `plush-${item.id}` === goods.id);
             return (
-              <Pressable key={goods.id} onPress={() => (owned ? (save(placeItem(room, goods.id, uid('plush'))), setPanel('room')) : buy(goods.id))} style={{ width: '30%', backgroundColor: theme.colors.card, borderRadius: 12, padding: 8, alignItems: 'center' }}>
-                <BuddyView buddyId={buddy?.id ?? 'mochi'} outfits={[]} mood="happy" streak={1} writing={false} finished={false} entryCount={1} size={64} />
+              <Pressable key={goods.id} accessibilityLabel={`${buddy?.name ?? goods.name} plush preview`} onPress={() => { setNote(''); setPreviewId(goods.id); }} style={{ width: '30%', backgroundColor: theme.colors.card, borderRadius: 12, padding: 8, alignItems: 'center' }}>
+                <BuddyView buddyId={buddy?.id ?? 'mochi'} outfits={[]} mood="happy" streak={1} writing finished entryCount={4} size={64} still />
                 <Text style={{ color: theme.colors.ink, fontFamily: theme.body, fontSize: 12 }}>{buddy?.name ?? goods.name}</Text>
-                <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, fontSize: 11 }}>{owned ? 'Place' : `${goods.price} coins`}</Text>
+                <Text style={{ color: theme.colors.ink, fontFamily: theme.body, fontSize: 11 }}>{owned ? 'Owned' : `${goods.price} coins`}</Text>
               </Pressable>
             );
           })}
@@ -199,7 +198,104 @@ export default function PalRoomScreen() {
           <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>{strokesFrom(room.items.find((item) => item.id === easelId)?.drawing).length} strokes on the canvas.</Text>
         </View>
       ) : null}
+      <ShopPreview
+        id={previewId}
+        room={room}
+        premium={wallet.premium}
+        note={note}
+        onClose={() => setPreviewId(null)}
+        onBuy={(id) => {
+          if (buy(id)) {
+            setPreviewId(null);
+            setPanel('room');
+          }
+        }}
+        onTheme={(id) => {
+          const result = buyTheme(room, wallet.coins, wallet.premium, id);
+          setNote(result.message);
+          if (!result.ok && result.message.includes('Diary Plus')) router.push('/paywall');
+          if (!result.ok) return;
+          save(result.room, result.coins);
+          setPreviewId(null);
+          setPanel('room');
+        }}
+        onPlace={(id) => {
+          const goods = goodsById(id);
+          save(placeItem(room, id, uid(goods?.kind === 'plush' ? 'plush' : 'room')));
+          setPreviewId(null);
+          setPanel('room');
+          setDecorate(true);
+        }}
+      />
     </Screen>
+  );
+}
+
+function ShopPreview({
+  id,
+  room,
+  premium,
+  note,
+  onClose,
+  onBuy,
+  onTheme,
+  onPlace,
+}: {
+  id: string | null;
+  room: PalRoom;
+  premium: boolean;
+  note: string;
+  onClose: () => void;
+  onBuy: (id: string) => void;
+  onTheme: (id: string) => void;
+  onPlace: (id: string) => void;
+}) {
+  const goods = id ? goodsById(id) : undefined;
+  const look = id ? ROOM_THEMES.find((item) => item.id === id) : undefined;
+  const buddy = goods?.kind === 'plush' ? BUDDIES.find((item) => goods.id === `plush-${item.id}`) : undefined;
+  const owned = goods ? room.ownedKinds.includes(goods.id) : look ? room.ownedThemes.includes(look.id) : false;
+  const price = look
+    ? owned
+      ? room.themeId === look.id ? 'In use' : 'Owned'
+      : look.premium ? 'Diary Plus' : look.price ? `${look.price} coins` : 'Free'
+    : goods
+      ? owned
+        ? 'Owned'
+        : goods.premium ? 'Diary Plus' : goods.price ? `${goods.price} coins` : 'Free'
+      : '';
+  const action = !id
+    ? undefined
+    : owned
+      ? look ? 'Use this theme' : 'Place in the room'
+      : (look?.premium || goods?.premium) && !premium
+        ? 'See Diary Plus'
+        : look
+          ? look.price ? `Buy for ${look.price} coins` : 'Use this theme'
+          : goods?.price
+            ? `Buy for ${goods.price} coins`
+            : 'Add it';
+  return (
+    <ItemPreview
+      visible={Boolean(id && (goods || look))}
+      title={look?.name ?? (buddy ? `${buddy.name} plush` : goods?.name ?? '')}
+      detail={note && id ? `${price}. ${note}` : price}
+      onClose={onClose}
+      actionLabel={action}
+      onAction={() => {
+        if (!id) return;
+        if (look) {
+          onTheme(id);
+          return;
+        }
+        if (owned) onPlace(id);
+        else if ((goods?.premium) && !premium) onBuy(id);
+        else onBuy(id);
+      }}
+    >
+      {look ? <RoomSwatch theme={look} width={260} height={170} /> : null}
+      {goods?.kind === 'furniture' ? <RoomSprite kind={goods.id} size={160} /> : null}
+      {goods?.kind === 'plush' ? <BuddyView buddyId={buddy?.id ?? 'mochi'} outfits={[]} mood="happy" streak={2} writing finished entryCount={4} size={160} /> : null}
+    </ItemPreview>
   );
 }
 

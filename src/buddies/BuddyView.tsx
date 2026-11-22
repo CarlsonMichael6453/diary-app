@@ -555,6 +555,7 @@ export function BuddyView({
   taps = false,
   onPress,
   wander = false,
+  still = false,
   ...ctx
 }: BuddyContext & {
   buddyId: string;
@@ -565,13 +566,14 @@ export function BuddyView({
   taps?: boolean;
   onPress?: () => void;
   wander?: boolean;
+  still?: boolean;
 }) {
   const theme = useTheme();
   const reduceMotion = useReduceMotion();
   const buddy = getBuddy(buddyId);
   const bob = useRef(new Animated.Value(0)).current;
-  const arrive = useRef(new Animated.Value(0.86)).current;
-  const bounce = useRef(new Animated.Value(0)).current;
+  const arrive = useRef(new Animated.Value(still ? 1 : 0.86)).current;
+  const bounce = useRef(new Animated.Value(still ? 2 : 0)).current;
   const breath = useRef(new Animated.Value(0)).current;
   const squish = useRef(new Animated.Value(0)).current;
   const [blink, setBlink] = useState(false);
@@ -580,7 +582,7 @@ export function BuddyView({
   const lastMood = useRef(ctx.mood);
 
   useEffect(() => {
-    if (reduceMotion) return;
+    if (reduceMotion || still) return;
     const duration = buddyId === 'shelly' ? 2800 : 1500;
     const loop = Animated.loop(
       Animated.sequence([
@@ -590,10 +592,10 @@ export function BuddyView({
     );
     loop.start();
     return () => loop.stop();
-  }, [bob, buddyId, reduceMotion]);
+  }, [bob, buddyId, reduceMotion, still]);
 
   useEffect(() => {
-    if (reduceMotion) {
+    if (reduceMotion || still) {
       arrive.setValue(1);
       bounce.setValue(2);
       return;
@@ -623,7 +625,7 @@ export function BuddyView({
       breathe.stop();
       clearTimeout(timer);
     };
-  }, [arrive, bounce, breath, reduceMotion]);
+  }, [arrive, bounce, breath, reduceMotion, still]);
 
   function squishTap() {
     playBuddySound(buddyId);

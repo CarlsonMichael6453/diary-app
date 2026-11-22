@@ -228,8 +228,9 @@ function drawOutfit(id: string, anchors: BuddyDef['anchors'], layer: 'back' | 'f
     );
   }
   if (id === 'scarf') {
-    const x = neck.x;
-    const y = neck.y;
+    const wrap = anchors.scarf ?? neck;
+    const x = wrap.x;
+    const y = wrap.y;
     const hang = lift === 1 ? -1 : 1;
     return (
       <G>

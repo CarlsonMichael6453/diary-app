@@ -31,7 +31,7 @@ export type BuddyDef = {
    * scale fits the pal's head. lift is which way the crown points: -1 up the screen,
    * +1 when the head hangs upside down (Batsy) so hats grow away from the face.
    */
-  anchors: { hat: Anchor; neck: Anchor; face: Anchor; pin: Anchor; scale: number; ears: number; lift?: number };
+  anchors: { hat: Anchor; neck: Anchor; face: Anchor; pin: Anchor; scale: number; ears: number; lift?: number; scarf?: Anchor };
   lines: {
     idle: string;
     writing: string;
@@ -139,7 +139,7 @@ export const BUDDIES: BuddyDef[] = [
     blurb: 'Grows a flower for every day of your writing streak.',
     premium: false,
     perch: 'br',
-    anchors: { hat: { x: 80, y: 70 }, neck: { x: 80, y: 124 }, face: { x: 80, y: 102 }, pin: { x: 80, y: 132 }, scale: 0.8, ears: 36 },
+    anchors: { hat: { x: 80, y: 70 }, neck: { x: 80, y: 124 }, face: { x: 80, y: 102 }, pin: { x: 80, y: 132 }, scale: 0.8, ears: 36, scarf: { x: 80, y: 140 } },
     lines: {
       idle: 'The soil of this page is still warm.',
       writing: 'Words are a kind of rain. Thank you.',
@@ -223,7 +223,7 @@ export const BUDDIES: BuddyDef[] = [
     blurb: 'Doodles in the margin based on how the page feels.',
     premium: false,
     perch: 'tl',
-    anchors: { hat: { x: 78, y: 42 }, neck: { x: 78, y: 108 }, face: { x: 78, y: 84 }, pin: { x: 104, y: 112 }, scale: 0.9, ears: 30 },
+    anchors: { hat: { x: 78, y: 42 }, neck: { x: 78, y: 108 }, face: { x: 78, y: 84 }, pin: { x: 104, y: 112 }, scale: 0.9, ears: 30, scarf: { x: 78, y: 124 } },
     lines: {
       idle: 'I am just testing the pen.',
       writing: 'Your letters have good shoulders.',
@@ -251,7 +251,7 @@ export const BUDDIES: BuddyDef[] = [
     blurb: 'Reads the daily prompt out loud, in a chick way.',
     premium: false,
     perch: 'br',
-    anchors: { hat: { x: 74, y: 48 }, neck: { x: 72, y: 104 }, face: { x: 73, y: 76 }, pin: { x: 92, y: 118 }, scale: 0.9, ears: 28 },
+    anchors: { hat: { x: 74, y: 48 }, neck: { x: 72, y: 104 }, face: { x: 73, y: 76 }, pin: { x: 92, y: 118 }, scale: 0.9, ears: 28, scarf: { x: 72, y: 114 } },
     lines: {
       idle: 'I have the prompt. No spoilers. Some spoilers.',
       writing: 'That is a good answer to the question.',
@@ -363,7 +363,7 @@ export const BUDDIES: BuddyDef[] = [
     blurb: 'A pocket dragon with opinions and a very small flame.',
     premium: true,
     perch: 'br',
-    anchors: { hat: { x: 78, y: 46 }, neck: { x: 78, y: 100 }, face: { x: 78, y: 74 }, pin: { x: 96, y: 118 }, scale: 0.85, ears: 24 },
+    anchors: { hat: { x: 78, y: 46 }, neck: { x: 78, y: 100 }, face: { x: 78, y: 74 }, pin: { x: 96, y: 118 }, scale: 0.85, ears: 24, scarf: { x: 78, y: 110 } },
     lines: {
       idle: 'I am guarding the blank part.',
       writing: 'Tell me a treasure. A sentence counts.',

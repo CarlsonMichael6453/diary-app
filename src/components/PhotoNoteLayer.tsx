@@ -2,6 +2,7 @@ import { useMemo, useRef, type ReactNode } from 'react';
 import { Image, PanResponder, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { holdDecoration } from '../logic/pageGesture';
+import { pointerAngle, rotationFromDrag } from '../logic/stickerPlacement';
 import type { NotePlacement, NoteStyle, PhotoFrame, PhotoPlacement } from '../models/types';
 import { useTheme } from '../theme/BookTheme';
 import { fontById } from '../theme/fonts';
@@ -70,6 +71,8 @@ function PlacedBox({
   const sizeRef = useRef({ w: pageWidth, h: pageHeight });
   sizeRef.current = { w: pageWidth, h: pageHeight };
   const origin = useRef(live.current);
+  const spin = useRef({ rotation: 0, vx: 0, vy: 0 });
+  const twist = useRef<{ angle: number; rotation: number } | null>(null);
 
   const pan = useMemo(
     () =>
@@ -79,12 +82,26 @@ function PlacedBox({
         onPanResponderTerminationRequest: (event) => event.nativeEvent.touches.length > 1,
         onPanResponderGrant: () => {
           holdDecoration(true);
+          twist.current = null;
           selectRef.current();
           origin.current = { ...live.current };
         },
-        onPanResponderRelease: () => holdDecoration(false),
-        onPanResponderTerminate: () => holdDecoration(false),
-        onPanResponderMove: (_, gesture) => {
+        onPanResponderRelease: () => {
+          twist.current = null;
+          holdDecoration(false);
+        },
+        onPanResponderTerminate: () => {
+          twist.current = null;
+          holdDecoration(false);
+        },
+        onPanResponderMove: (event, gesture) => {
+          const touches = event.nativeEvent.touches ?? [];
+          if (touches.length >= 2) {
+            const angle = pointerAngle(touches[0].pageX, touches[0].pageY, touches[1].pageX, touches[1].pageY);
+            if (!twist.current) twist.current = { angle, rotation: live.current.rotation };
+            moveRef.current({ ...live.current, rotation: rotationFromDrag(twist.current.rotation, twist.current.angle, angle) });
+            return;
+          }
           const width = sizeRef.current.w || 1;
           const height = sizeRef.current.h || 1;
           moveRef.current({
@@ -116,6 +133,35 @@ function PlacedBox({
     [],
   );
 
+  const turnPan = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderTerminationRequest: () => false,
+        onPanResponderGrant: () => {
+          holdDecoration(true);
+          const box = BASE * live.current.scale;
+          const localX = 3 - box / 2;
+          const localY = box / 2 - 3;
+          const radians = ((live.current.rotation || 0) * Math.PI) / 180;
+          spin.current = {
+            rotation: live.current.rotation || 0,
+            vx: localX * Math.cos(radians) - localY * Math.sin(radians),
+            vy: localX * Math.sin(radians) + localY * Math.cos(radians),
+          };
+        },
+        onPanResponderRelease: () => holdDecoration(false),
+        onPanResponderTerminate: () => holdDecoration(false),
+        onPanResponderMove: (_, gesture) => {
+          const start = (Math.atan2(spin.current.vy, spin.current.vx) * 180) / Math.PI;
+          const current = (Math.atan2(spin.current.vy + gesture.dy, spin.current.vx + gesture.dx) * 180) / Math.PI;
+          moveRef.current({ ...live.current, rotation: rotationFromDrag(spin.current.rotation, start, current) });
+        },
+      }),
+    [],
+  );
+
   if (pageWidth < 20) return null;
   const size = BASE * scale;
   return (
@@ -129,7 +175,7 @@ function PlacedBox({
     >
       {children}
       {selected ? <View {...scalePan.panHandlers} style={styles.knob} /> : null}
-      {selected ? <View style={styles.turn} onTouchEnd={() => moveRef.current({ ...live.current, rotation: (live.current.rotation + 15) % 360 })} /> : null}
+      {selected ? <View {...turnPan.panHandlers} accessibilityLabel="Rotate" style={styles.turn} /> : null}
     </View>
   );
 }

@@ -10,6 +10,7 @@ import { getMood } from '@/src/data/moods';
 import { formatPretty } from '@/src/logic/dates';
 import { useBrowseFilter } from '@/src/logic/browseFilter';
 import { entryMatches, filterIsActive } from '@/src/logic/entryFilter';
+import { pageOrdinalLabel } from '@/src/logic/bookPages';
 import { entryBookId } from '@/src/logic/memories';
 import { snippetAround } from '@/src/logic/search';
 import { mergeTagCatalog } from '@/src/logic/tags';
@@ -71,7 +72,7 @@ export default function SearchScreen() {
             const hay = `${entry.title} ${entry.body}`;
             return (
               <Pressable key={entry.id} onPress={() => router.push(`/entry/${entry.id}` as Href)} style={{ backgroundColor: theme.colors.card, borderRadius: theme.radius, padding: 14, borderLeftWidth: 6, borderLeftColor: mood.color }}>
-                <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, fontSize: 12 }}>{formatPretty(entry.date)} · {mood.emoji}{entry.voiceNote ? ' ' : ''}{entry.voiceNote ? <VoiceMark /> : null}</Text>
+                <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, fontSize: 12 }}>{formatPretty(entry.date)}{pageOrdinalLabel(inBook, entry) ? ` · ${pageOrdinalLabel(inBook, entry)}` : ''} · {mood.emoji}{entry.voiceNote ? ' ' : ''}{entry.voiceNote ? <VoiceMark /> : null}</Text>
                 <Highlight text={entry.title || 'Untitled page'} query={query} style={{ color: theme.colors.ink, fontFamily: theme.script, fontSize: 24 }} />
                 <Highlight text={snippetAround(hay, query)} query={query} style={{ color: theme.colors.inkSoft, fontFamily: theme.body, marginTop: 4 }} />
               </Pressable>

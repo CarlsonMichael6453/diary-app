@@ -32,6 +32,40 @@ export function releaseCurl(direction: 'next' | 'prev', reveal: number, velocity
 const COMMIT = CURL_COMMIT;
 const FLING = CURL_FLING;
 
+/** A corner fold has to travel this far inward before it can turn the page. A tap is nowhere near it. */
+export const CORNER_COMMIT = 72;
+
+/**
+ * A drag that starts in a corner and pulls inward. A tap, or a vertical scroll
+ * that only brushes the corner, returns null.
+ */
+export function cornerFold(
+  startX: number,
+  startY: number,
+  dx: number,
+  dy: number,
+  width: number,
+  height: number,
+): { direction: 'next' | 'prev'; inward: number } | null {
+  if (width < 40 || height < 40) return null;
+  const onEdge = startY < height * 0.34 || startY > height * 0.66;
+  if (!onEdge) return null;
+  const fromRight = startX > width * 0.78;
+  const fromLeft = startX < width * 0.22;
+  if (!fromRight && !fromLeft) return null;
+  const inward = fromRight ? -dx : dx;
+  if (inward < 36) return null;
+  if (inward < Math.abs(dy) * 0.45) return null;
+  return { direction: fromRight ? 'next' : 'prev', inward };
+}
+
+export function releaseCorner(inward: number, velocityX: number, blocked: boolean): 'commit' | 'cancel' {
+  if (blocked) return 'cancel';
+  if (inward >= CORNER_COMMIT) return 'commit';
+  if (Math.abs(velocityX) >= CURL_FLING && inward >= 36) return 'commit';
+  return 'cancel';
+}
+
 /**
  * Negative progress is a swipe toward the next page.
  * Past about 18% of the width commits. A modest fling commits a shorter drag.

@@ -4,14 +4,18 @@ import { makeMutable } from 'react-native-reanimated';
 export const decorationDrag = makeMutable(0);
 
 let pageScroll: ((enabled: boolean) => void) | null = null;
+let scrollHolds = 0;
 
 /** The open page registers this so a sticker, photo, note, tag, or mood press can hold the scroll. */
 export function bindPageScroll(fn: ((enabled: boolean) => void) | null) {
   pageScroll = fn;
+  if (fn) fn(scrollHolds === 0);
 }
 
+/** Several gestures can hold the page at once. It scrolls again only when every hold lets go. */
 export function holdPage(held: boolean) {
-  pageScroll?.(!held);
+  scrollHolds = Math.max(0, scrollHolds + (held ? 1 : -1));
+  pageScroll?.(scrollHolds === 0);
 }
 
 export function holdDecoration(held: boolean) {

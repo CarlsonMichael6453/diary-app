@@ -65,6 +65,24 @@ export function pageTrail(saved: PageSpot[], current: PageSpot, today: string): 
   return stops;
 }
 
+/** Pages written on one date, oldest first. Page 1 is the first one created that day. */
+export function sameDayPages<T extends PageSpot>(pages: T[], date: string): T[] {
+  return orderedPages(pages.filter((page) => page.date === date));
+}
+
+/** 1-based index when a day has more than one page. A lone page has no number. */
+export function pageOrdinal<T extends PageSpot>(pages: T[], page: PageSpot): number | null {
+  const same = sameDayPages(pages, page.date);
+  if (same.length < 2) return null;
+  const index = same.findIndex((item) => item.id === page.id);
+  return index < 0 ? null : index + 1;
+}
+
+export function pageOrdinalLabel<T extends PageSpot>(pages: T[], page: PageSpot): string | null {
+  const ordinal = pageOrdinal(pages, page);
+  return ordinal ? `Page ${ordinal}` : null;
+}
+
 export function pageNeighbors(saved: PageSpot[], current: PageSpot, today: string): { prev: PageStop | null; next: PageStop | null } {
   const stops = pageTrail(saved, current, today);
   const index = stops.findIndex((stop) => (stop.kind === 'entry' ? stop.id === current.id : !saved.some((page) => page.id === current.id) && stop.date === current.date && stop.kind === 'blank'));

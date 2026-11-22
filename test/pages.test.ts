@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { pageOrdinalLabel } from '../src/logic/bookPages';
 import { collageSlots } from '../src/logic/collage';
 import { PAGE_TEXT_ID, isBehindText, reorderStack } from '../src/logic/layers';
 import { restoreSavedDesigns } from '../src/logic/savedDesigns';
@@ -71,5 +72,16 @@ describe('page layers and photos', () => {
     }]);
     assert.equal(dirty.entries[0]?.photoPlacements?.[0]?.frame, 'none');
     assert.equal(dirty.entries[0]?.notes?.[0]?.style, 'none');
+  });
+
+  it('numbers a second page on the same day and leaves a single page unnumbered', () => {
+    const pages = [
+      { id: 'a', date: '2026-11-22', createdAt: 2 },
+      { id: 'b', date: '2026-11-22', createdAt: 1 },
+      { id: 'c', date: '2026-11-21', createdAt: 3 },
+    ];
+    assert.equal(pageOrdinalLabel(pages, pages[2]), null);
+    assert.equal(pageOrdinalLabel(pages, pages[1]), 'Page 1');
+    assert.equal(pageOrdinalLabel(pages, pages[0]), 'Page 2');
   });
 });

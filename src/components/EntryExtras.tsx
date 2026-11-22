@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
-import { cleanTag, mergeTagCatalog, selectCreatedTag, tagSummary, toggleTag } from '../logic/tags';
+import { cleanTag, mergeTagCatalog, renameInList, renameTag, selectCreatedTag, tagSummary, toggleTag } from '../logic/tags';
 import { TEMPLATES } from '../logic/templates';
 import { capturePlace } from '../services/place';
 import { useDiary } from '../store/useDiary';
@@ -26,6 +26,9 @@ export function TagMenu({
   const patchSettings = useDiary((state) => state.patchSettings);
   const [open, setOpen] = useState(false);
   const [tag, setTag] = useState('');
+  const [editing, setEditing] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const held = useRef(false);
   const chosen = activities ?? [];
   const selected = tags ?? [];
   const catalog = useMemo(() => mergeTagCatalog(savedTags, [...entries, { tags: selected }]), [savedTags, entries, selected]);
@@ -36,6 +39,7 @@ export function TagMenu({
     onChange({ tags: next.tags });
     patchSettings({ savedTags: next.catalog });
     setTag('');
+    setEditing(null);
     const name = next.tags[next.tags.length - 1];
     if (typeof document === 'undefined' || !name) return;
     requestAnimationFrame(() => {
@@ -46,6 +50,23 @@ export function TagMenu({
       const listRect = list.getBoundingClientRect();
       list.scrollTop += itemRect.top - listRect.top - 8;
     });
+  }
+
+  function beginRename(name: string) {
+    held.current = true;
+    setEditing(name);
+    setEditValue(name);
+  }
+
+  function commitRename() {
+    if (!editing) return;
+    const next = renameTag(selected, catalog, editing, editValue);
+    onChange({ tags: next.tags });
+    useDiary.setState((state) => ({
+      entries: state.entries.map((entry) => ({ ...entry, tags: renameInList(entry.tags, editing, editValue) })),
+      settings: { ...state.settings, savedTags: next.catalog },
+    }));
+    setEditing(null);
   }
 
   return (
@@ -67,28 +88,62 @@ export function TagMenu({
         })}
         {catalog.map((item) => {
           const on = selected.some((value) => value.toLowerCase() === item.toLowerCase());
+          if (editing?.toLowerCase() === item.toLowerCase()) {
+            return (
+              <View key={item} style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                <TextInput
+                  value={editValue}
+                  onChangeText={setEditValue}
+                  autoFocus
+                  accessibilityLabel={`Rename ${item}`}
+                  onSubmitEditing={commitRename}
+                  style={{ flex: 1, backgroundColor: theme.colors.bg, color: theme.colors.ink, borderRadius: 10, padding: 8, fontFamily: theme.body }}
+                />
+                <Pressable accessibilityLabel="Save tag name" onPress={commitRename} style={{ paddingHorizontal: 10, paddingVertical: 8, borderRadius: 999, backgroundColor: theme.colors.accent }}>
+                  <Text style={{ color: theme.colors.onAccent, fontFamily: theme.body }}>Save</Text>
+                </Pressable>
+              </View>
+            );
+          }
           return (
-            <Pressable
-              key={item}
-              accessibilityRole="checkbox"
-              accessibilityLabel={`Tag ${item}`}
-              accessibilityState={{ checked: on }}
-              {...({ dataSet: { tagName: item } } as object)}
-              onPress={() => onChange({ tags: toggleTag(selected, item) })}
-              style={{ paddingHorizontal: 10, paddingVertical: 8, borderRadius: 999, backgroundColor: on ? theme.colors.accent : theme.colors.chip, alignSelf: 'flex-start' }}
-            >
-              <Text style={{ color: on ? theme.colors.onAccent : theme.colors.chipInk, fontFamily: theme.body }}>{on ? '✓ ' : ''}{item}</Text>
-            </Pressable>
+            <View key={item} style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: 999, backgroundColor: on ? theme.colors.accent : theme.colors.chip, borderWidth: on ? 2 : 0, borderColor: theme.colors.paperInk }} {...({ dataSet: { tagName: item } } as object)}>
+              <Pressable
+                accessibilityRole="checkbox"
+                accessibilityLabel={`Tag ${item}`}
+                accessibilityState={{ checked: on }}
+                delayLongPress={450}
+                onLongPress={() => beginRename(item)}
+                onPress={() => {
+                  if (held.current) {
+                    held.current = false;
+                    return;
+                  }
+                  onChange({ tags: toggleTag(selected, item) });
+                }}
+                style={{ paddingLeft: 10, paddingRight: 6, paddingVertical: 8 }}
+              >
+                <Text style={{ color: on ? theme.colors.onAccent : theme.colors.chipInk, fontFamily: theme.body }}>{on ? '✓ ' : ''}{item}</Text>
+              </Pressable>
+              <Pressable accessibilityLabel={`Rename ${item}`} onPress={() => beginRename(item)} style={{ paddingRight: 10, paddingVertical: 8 }}>
+                <Text style={{ color: on ? theme.colors.onAccent : theme.colors.chipInk, fontFamily: theme.body }}>✎</Text>
+              </Pressable>
+            </View>
           );
         })}
-        <TextInput
-          value={tag}
-          onChangeText={setTag}
-          placeholder="Add a tag"
-          placeholderTextColor={theme.colors.inkSoft}
-          onSubmitEditing={createTag}
-          style={{ backgroundColor: theme.colors.bg, color: theme.colors.ink, borderRadius: 10, padding: 8, fontFamily: theme.body }}
-        />
+        <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+          <TextInput
+            value={tag}
+            onChangeText={setTag}
+            placeholder="Add a tag"
+            placeholderTextColor={theme.colors.inkSoft}
+            onSubmitEditing={createTag}
+            returnKeyType="done"
+            style={{ flex: 1, backgroundColor: theme.colors.bg, color: theme.colors.ink, borderRadius: 10, padding: 8, fontFamily: theme.body }}
+          />
+          <Pressable accessibilityLabel="Add tag" onPress={createTag} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: theme.colors.accent }}>
+            <Text style={{ color: theme.colors.onAccent, fontFamily: theme.body }}>Add</Text>
+          </Pressable>
+        </View>
       </View>
     </ChoiceMenu>
   );

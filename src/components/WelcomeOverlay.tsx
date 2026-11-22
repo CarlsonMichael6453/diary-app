@@ -1,4 +1,4 @@
-import { router, type Href } from 'expo-router';
+import { router, usePathname, type Href } from 'expo-router';
 import { Text, View } from 'react-native';
 
 import { useDiary } from '../store/useDiary';
@@ -7,9 +7,10 @@ import { Button } from './ui';
 
 export function WelcomeOverlay() {
   const theme = useTheme();
+  const path = usePathname();
   const seen = useDiary((state) => state.settings.seenWelcome);
   const patchSettings = useDiary((state) => state.patchSettings);
-  if (seen) return null;
+  if (seen || path.includes('pal-fit')) return null;
 
   function finish(href?: Href) {
     patchSettings({ seenWelcome: true });

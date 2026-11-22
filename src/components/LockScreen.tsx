@@ -1,3 +1,4 @@
+import { usePathname } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, AppState, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
@@ -88,6 +89,7 @@ export function showPasscodeError(message: string) {
 }
 
 export function LockOverlay() {
+  const path = usePathname();
   const theme = useTheme();
   const reduceMotion = useReduceMotion();
   const lockOnOpen = useDiary((state) => state.settings.lockOnOpen);
@@ -219,7 +221,7 @@ export function LockOverlay() {
     if (!settings.lockEnabled) openBook();
   }
 
-  if (open) return null;
+  if (open || path.includes('pal-fit')) return null;
 
   const coverStyle = {
     transform: [

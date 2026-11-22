@@ -14,6 +14,7 @@ import { loginProgress } from '../logic/streak';
 import { writingStreak } from '../logic/streak';
 import type { DiaryEntry, Settings, Snapshot, Wallet } from '../models/types';
 import { restoreSavedDesigns } from '../logic/savedDesigns';
+import { defaultRoom } from '../room/edit';
 import type { ColorDesign } from '../theme/designs';
 import { getProduct } from '../services/purchases';
 import { STICKERS, getPack, getSticker, stickersInPack } from '../stickers/catalog';
@@ -91,6 +92,16 @@ function seedEntries(): DiaryEntry[] {
       stickers: place(1, 0.7, 0.4, 8),
       themeOverride: null,
     }),
+    page({
+      id: 'sample-year',
+      date: `${Number(today.slice(0, 4)) - 1}${today.slice(4)}`,
+      title: 'The long way home',
+      body: 'A year ago the long street still felt like the right one.',
+      mood: 'grateful',
+      tags: ['walk'],
+      stickers: [],
+      themeOverride: null,
+    }),
   ];
 }
 
@@ -136,6 +147,7 @@ export function defaultSettings(): Settings {
     deepWriting: false,
     savedTags: [],
     writingPrompts: true,
+    room: defaultRoom(),
   };
 }
 

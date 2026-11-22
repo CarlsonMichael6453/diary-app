@@ -126,6 +126,7 @@ export type Settings = {
   savedTags: string[];
   /** Show a writing question at the top of each page. */
   writingPrompts: boolean;
+  room: import('../room/edit').PalRoom;
 };
 
 export type Wallet = {

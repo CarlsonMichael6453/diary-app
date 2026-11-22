@@ -1,5 +1,7 @@
 import { router, type Href } from 'expo-router';
 import { useState } from 'react';
+import type { MoodId } from '@/src/data/moods';
+import { MOODS } from '@/src/data/moods';
 import { Pressable, Text, View } from 'react-native';
 
 import { BUDDIES, OUTFITS, canEquipOutfit, getBuddy } from '@/src/buddies/catalog';
@@ -18,6 +20,7 @@ export default function BuddiesScreen() {
   const toggleOutfit = useDiary((state) => state.toggleOutfit);
   const buyOutfit = useDiary((state) => state.buyOutfit);
   const [note, setNote] = useState('');
+  const [preview, setPreview] = useState<MoodId>('happy');
   const current = getBuddy(settings.buddyId);
 
   return (
@@ -30,7 +33,14 @@ export default function BuddiesScreen() {
       <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>They sit on the page, react to the mood, and wear what you earn.</Text>
       {current ? (
         <View style={{ alignItems: 'center', marginVertical: 8 }}>
-          <BuddyView buddyId={current.id} outfits={settings.outfitIds} mood="happy" streak={4} writing finished entryCount={8} showLine size={160} />
+          <BuddyView buddyId={current.id} outfits={settings.outfitIds} mood={preview} streak={4} writing finished entryCount={8} showLine size={160} taps />
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
+            {MOODS.map((mood) => (
+              <Pressable key={mood.id} accessibilityLabel={mood.label} onPress={() => setPreview(mood.id)} style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, backgroundColor: preview === mood.id ? mood.color : theme.colors.chip }}>
+                <Text>{mood.emoji}</Text>
+              </Pressable>
+            ))}
+          </View>
         </View>
       ) : (
         <Text style={{ color: theme.colors.ink, fontFamily: theme.script, fontSize: 22, marginVertical: 12 }}>The page is just yours. No pal.</Text>
@@ -67,6 +77,7 @@ export default function BuddiesScreen() {
         })}
       </View>
 
+      <Button label="Visit their room" onPress={() => router.push('/room' as Href)} />
       <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 26, marginTop: 18 }}>Wardrobe</Text>
       <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, marginBottom: 8 }}>Up to one item per spot. Games, streaks, and coins fill this out.</Text>
       {note ? <Text style={{ color: theme.colors.ink, fontFamily: theme.body, marginBottom: 8 }}>{note}</Text> : null}

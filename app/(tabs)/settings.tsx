@@ -11,7 +11,8 @@ import { Screen } from '@/src/components/Screen';
 import { Button, Confirm, FieldLabel } from '@/src/components/ui';
 import { syncReminder } from '@/src/services/notifications';
 import { biometricAvailable } from '@/src/services/biometrics';
-import { checkPasscode, clearPasscode, hasPasscode, savePasscode } from '@/src/services/secure';
+import { describeWait } from '@/src/logic/lockout';
+import { clearPasscode, hasPasscode, savePasscode, verifyPasscode } from '@/src/services/secure';
 import { useDiary } from '@/src/store/useDiary';
 import { useTheme } from '@/src/theme/BookTheme';
 import { pickSaying } from '@/src/logic/sayings';
@@ -316,12 +317,16 @@ export default function SettingsScreen() {
                 setNotice('Passcode saved. The book locks the next time it opens.');
                 return;
               }
-              const ok = await checkPasscode(pin);
-              if (!ok && !(await hasPasscode())) {
+              const result = await verifyPasscode(pin);
+              if (!result.ok && result.lockedMs > 0) {
+                setPinError(`Too many tries. Wait ${describeWait(result.lockedMs)}.`);
+                return;
+              }
+              if (!result.ok && !(await hasPasscode())) {
                 setPinError('No passcode is stored yet.');
                 return;
               }
-              if (!ok) {
+              if (!result.ok) {
                 setPinError('That is not the current passcode.');
                 return;
               }

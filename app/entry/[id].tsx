@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams, type Href } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BackHandler, PanResponder, Platform, Pressable, ScrollView, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { BackHandler, PanResponder, Platform, Pressable, ScrollView, Text, TextInput, useWindowDimensions, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BuddyView } from '@/src/buddies/BuddyView';
@@ -47,7 +47,7 @@ import { resolveEntryLook, type ColorDesign } from '@/src/theme/designs';
 import { applyType, FONT_CHOICES, INK_SWATCHES, sanitizeInk } from '@/src/theme/fonts';
 import { THEMES, getTheme, type ThemeId } from '@/src/theme/themes';
 
-const webScroll = { touchAction: 'manipulation', overscrollBehaviorY: 'contain', WebkitOverflowScrolling: 'touch' } as const;
+const webScroll = (Platform.OS === 'web' ? { touchAction: 'manipulation', overscrollBehaviorY: 'contain', WebkitOverflowScrolling: 'touch' } : {}) as ViewStyle;
 
 type Draft = {
   id: string;

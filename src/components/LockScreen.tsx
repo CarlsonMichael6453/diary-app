@@ -7,7 +7,8 @@ import { BookCover } from './BookCover';
 import { biometricAvailable, unlockWithBiometric } from '../services/biometrics';
 import { bookOpenStyle } from '../logic/bookOpen';
 import { playBookOpen } from '../services/sounds';
-import { checkPasscode } from '../services/secure';
+import { describeWait } from '../logic/lockout';
+import { verifyPasscode } from '../services/secure';
 import { useReduceMotion } from '../theme/useReduceMotion';
 import { useTheme } from '../theme/BookTheme';
 import { useDiary } from '../store/useDiary';
@@ -257,8 +258,9 @@ export function LockOverlay() {
             title="Open the book"
             subtitle="Passcode, or Face ID when this phone has it."
             onComplete={async (pin) => {
-              const ok = await checkPasscode(pin);
-              if (ok) openBook();
+              const result = await verifyPasscode(pin);
+              if (result.ok) openBook();
+              else if (result.lockedMs > 0) showPasscodeError(`Too many tries. Wait ${describeWait(result.lockedMs)}.`);
               else showPasscodeError('That passcode does not open the book.');
             }}
           />

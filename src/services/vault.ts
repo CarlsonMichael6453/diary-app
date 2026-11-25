@@ -14,20 +14,11 @@ export function setVaultEncryption(enabled: boolean) {
 async function readKey(): Promise<Uint8Array> {
   const existing = Platform.OS === 'web' ? await AsyncStorage.getItem(KEY) : await SecureStore.getItemAsync(KEY);
   if (existing) return hexToBytes(existing);
-  const created = bytesToHex(randomKeyFromCrypto());
+  // randomKey() throws when the platform has no secure random source. Better to fail than to use a guessable key.
+  const created = bytesToHex(randomKey());
   if (Platform.OS === 'web') await AsyncStorage.setItem(KEY, created);
   else await SecureStore.setItemAsync(KEY, created);
   return hexToBytes(created);
-}
-
-function randomKeyFromCrypto(): Uint8Array {
-  try {
-    return randomKey();
-  } catch {
-    const bytes = new Uint8Array(32);
-    for (let i = 0; i < bytes.length; i += 1) bytes[i] = Math.floor(Math.random() * 256);
-    return bytes;
-  }
 }
 
 export const vaultStorage = {

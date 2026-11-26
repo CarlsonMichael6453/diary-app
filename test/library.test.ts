@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { entriesToCsv, openSealedBackup, parseImport, sealBackup, weatherUrl } from '../src/logic/backup';
-import { decryptString, encryptString, randomKey } from '../src/logic/crypto';
+import { BACKUP_ROUNDS, bytesToHex, decryptString, deriveBackupKey, derivePinHash, encryptString, LEGACY_BACKUP_ROUNDS, newSalt, randomKey, sameHex } from '../src/logic/crypto';
 import { healthMoodNotes } from '../src/logic/health';
 import { backupIsDue, memoriesOnThisDay } from '../src/logic/memories';
 import { SAYINGS, inQuietHours, pickSaying } from '../src/logic/sayings';
@@ -27,6 +27,33 @@ describe('library', () => {
     assert.equal(file.includes('UNIQUE_BODY_zz'), false);
     assert.equal(openSealedBackup(file, 'ink-1234'), json);
     assert.throws(() => openSealedBackup(file, 'nope'));
+    const parsed = JSON.parse(file) as { rounds?: number };
+    assert.equal(parsed.rounds, BACKUP_ROUNDS);
+  });
+
+  it('opens legacy 20,000-round backups that omit rounds', () => {
+    const json = JSON.stringify({ title: 'LEGACY_ENTRY_zz' });
+    const salt = newSalt();
+    const key = deriveBackupKey('old-pass', salt, LEGACY_BACKUP_ROUNDS);
+    const legacy = JSON.stringify({
+      version: 2,
+      encrypted: true,
+      salt: bytesToHex(salt),
+      payload: encryptString(json, key),
+    });
+    assert.equal(openSealedBackup(legacy, 'old-pass'), json);
+    assert.throws(() => openSealedBackup(legacy, 'wrong-pass'));
+  });
+
+  it('salts four-digit passcodes and verifies with constant-time hex compare', () => {
+    const saltA = newSalt();
+    const saltB = newSalt();
+    const hashA = bytesToHex(derivePinHash('1234', saltA));
+    const hashB = bytesToHex(derivePinHash('1234', saltB));
+    assert.notEqual(hashA, hashB);
+    assert.equal(sameHex(bytesToHex(derivePinHash('1234', saltA)), hashA), true);
+    assert.equal(sameHex(bytesToHex(derivePinHash('9999', saltA)), hashA), false);
+    assert.equal(sameHex(hashA, hashA.slice(0, -1)), false);
   });
 
   it('remembers other years on this day and when a backup is due', () => {

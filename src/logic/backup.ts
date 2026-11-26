@@ -54,13 +54,15 @@ function escapeHtml(value: string): string {
 
 export function sealBackup(json: string, passphrase: string): string {
   const sealed = encryptWithPassphrase(json, passphrase);
-  return JSON.stringify({ version: 2, encrypted: true, salt: sealed.salt, payload: sealed.payload });
+  return JSON.stringify({ version: 2, encrypted: true, salt: sealed.salt, rounds: sealed.rounds, payload: sealed.payload });
 }
 
 export function openSealedBackup(raw: string, passphrase: string): string {
-  const parsed = JSON.parse(raw) as { encrypted?: boolean; salt?: string; payload?: string };
+  const parsed = JSON.parse(raw) as { encrypted?: boolean; salt?: string; payload?: string; rounds?: number };
   if (!parsed.encrypted || !parsed.salt || !parsed.payload) throw new Error('That file is not an encrypted backup.');
-  return decryptWithPassphrase(parsed.payload, parsed.salt, passphrase);
+  // Files without `rounds` were sealed with the old 20,000-round setting.
+  const rounds = typeof parsed.rounds === 'number' && Number.isInteger(parsed.rounds) && parsed.rounds > 0 && parsed.rounds <= 5_000_000 ? parsed.rounds : undefined;
+  return decryptWithPassphrase(parsed.payload, parsed.salt, passphrase, rounds);
 }
 
 export function weatherUrl(latitude: number, longitude: number): string {

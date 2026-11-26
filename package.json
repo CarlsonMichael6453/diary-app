@@ -70,7 +70,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web --port 43123",
     "export:web": "expo export --platform web",
-    "test": "node --import tsx --test test/*.test.ts"
+    "test": "node --import tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
   },
   "private": true
 }

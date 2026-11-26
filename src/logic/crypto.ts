@@ -3,7 +3,12 @@ import { bytesToHex, bytesToUtf8, hexToBytes, randomBytes, utf8ToBytes } from '@
 import { pbkdf2 } from '@noble/hashes/pbkdf2.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 
-const PBKDF2_ROUNDS = 20_000;
+/** Backups made before rounds were recorded in the file used this many. */
+export const LEGACY_BACKUP_ROUNDS = 20_000;
+/** New backups. Raise this if a test phone seals a backup in well under a second. */
+export const BACKUP_ROUNDS = 200_000;
+/** The passcode is only four digits, so this slows guessing but cannot stop an offline attack. */
+const PIN_ROUNDS = 100_000;
 
 function concat(parts: Uint8Array[]): Uint8Array {
   const length = parts.reduce((sum, part) => sum + part.length, 0);
@@ -44,19 +49,36 @@ export function decryptString(payload: string, key: Uint8Array): string {
   return bytesToUtf8(cipher.decrypt(sealed));
 }
 
-export function deriveBackupKey(passphrase: string, salt: Uint8Array): Uint8Array {
-  return pbkdf2(sha256, utf8ToBytes(passphrase), salt, { c: PBKDF2_ROUNDS, dkLen: 32 });
+export function deriveBackupKey(passphrase: string, salt: Uint8Array, rounds: number = BACKUP_ROUNDS): Uint8Array {
+  return pbkdf2(sha256, utf8ToBytes(passphrase), salt, { c: rounds, dkLen: 32 });
 }
 
-export function encryptWithPassphrase(plain: string, passphrase: string): { salt: string; payload: string } {
+export function encryptWithPassphrase(plain: string, passphrase: string): { salt: string; payload: string; rounds: number } {
   const salt = randomBytes(16);
-  const key = deriveBackupKey(passphrase, salt);
-  return { salt: bytesToHex(salt), payload: encryptString(plain, key) };
+  const key = deriveBackupKey(passphrase, salt, BACKUP_ROUNDS);
+  return { salt: bytesToHex(salt), payload: encryptString(plain, key), rounds: BACKUP_ROUNDS };
 }
 
-export function decryptWithPassphrase(payload: string, saltHex: string, passphrase: string): string {
-  const key = deriveBackupKey(passphrase, hexToBytes(saltHex));
+export function decryptWithPassphrase(payload: string, saltHex: string, passphrase: string, rounds: number = LEGACY_BACKUP_ROUNDS): string {
+  const key = deriveBackupKey(passphrase, hexToBytes(saltHex), rounds);
   return decryptString(payload, key);
+}
+
+/** Salted, slow hash for the four-digit passcode. */
+export function derivePinHash(pin: string, salt: Uint8Array): Uint8Array {
+  return pbkdf2(sha256, utf8ToBytes(`diary-app:${pin}`), salt, { c: PIN_ROUNDS, dkLen: 32 });
+}
+
+export function newSalt(): Uint8Array {
+  return randomBytes(16);
+}
+
+/** Compares without stopping at the first differing character. */
+export function sameHex(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i += 1) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
 }
 
 export function randomKey(): Uint8Array {

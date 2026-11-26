@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
+import { hasInlineBase64Photos, migrateBookPhotos } from '../logic/photoRefs';
+import { pruneUnusedPhotos, savePhotoDataUrl } from '../services/photoStorage';
 import { vaultStorage } from '../services/vault';
 
 import { canEquipOutfit, getOutfit } from '../buddies/catalog';
@@ -148,6 +150,7 @@ export function defaultSettings(): Settings {
     savedTags: [],
     writingPrompts: true,
     room: defaultRoom(),
+    photosMigrated: false,
   };
 }
 
@@ -200,6 +203,7 @@ type DiaryStore = DiaryData & {
   offerPageDesign: (entryId: string, design: ColorDesign | null) => void;
   pageDesignSeed: ColorDesign | null;
   pageDesignTicket: { token: number; entryId: string; design: ColorDesign | null } | null;
+  migratePhotos: () => Promise<void>;
 };
 
 function asSnapshot(value: unknown): Snapshot | null {
@@ -208,6 +212,8 @@ function asSnapshot(value: unknown): Snapshot | null {
   if ((record.version !== 1 && record.version !== 2) || !record.settings || !record.wallet || !Array.isArray(record.entries)) return null;
   return record;
 }
+
+let inflightPhotoMigration: Promise<void> | null = null;
 
 export const useDiary = create<DiaryStore>()(
   persist(
@@ -236,7 +242,11 @@ export const useDiary = create<DiaryStore>()(
         });
         return bonus;
       },
-      deleteEntry: (id) => set((state) => ({ entries: state.entries.filter((entry) => entry.id !== id) })),
+      deleteEntry: (id) => {
+        set((state) => ({ entries: state.entries.filter((entry) => entry.id !== id) }));
+        const next = get();
+        void pruneUnusedPhotos(next.entries, next.settings.room);
+      },
       patchSettings: (patch) => set((state) => ({ settings: { ...state.settings, ...patch } })),
       setBuddy: (buddyId) => set((state) => ({ settings: { ...state.settings, buddyId } })),
       toggleOutfit: (outfitId) => {
@@ -380,13 +390,18 @@ export const useDiary = create<DiaryStore>()(
         if (!snapshot) return { ok: false, message: 'That file is not a Diary App backup.' };
         const restored = restoreSavedDesigns(snapshot.settings, snapshot.entries, snapshot.books ?? snapshot.settings.books);
         set({
-          settings: { ...defaultSettings(), ...restored.settings },
+          settings: { ...defaultSettings(), ...restored.settings, photosMigrated: false },
           entries: restored.entries,
           wallet: { ...defaultWallet(), ...snapshot.wallet },
         });
+        void get().migratePhotos();
         return { ok: true, message: 'Backup restored on this device.' };
       },
-      resetBook: () => set(initialData()),
+      resetBook: () => {
+        set(initialData());
+        const next = get();
+        void pruneUnusedPhotos(next.entries, next.settings.room);
+      },
       setActiveBook: (bookId) =>
         set((state) => {
           const book = state.settings.books.find((item) => item.id === bookId);
@@ -416,6 +431,68 @@ export const useDiary = create<DiaryStore>()(
             ? state.entries.map((entry) => (entry.id === entryId ? { ...entry, design: design ?? undefined, updatedAt: Date.now() } : entry))
             : state.entries,
         })),
+      migratePhotos: async () => {
+        if (inflightPhotoMigration) return inflightPhotoMigration;
+        inflightPhotoMigration = (async () => {
+          const current = get();
+          const needsScan = !current.settings.photosMigrated || hasInlineBase64Photos(current.entries, current.settings.room);
+          if (!needsScan) return;
+          if (!hasInlineBase64Photos(current.entries, current.settings.room)) {
+            set((state) => ({ settings: { ...state.settings, photosMigrated: true } }));
+            return;
+          }
+          const replacements = new Map<string, string>();
+          const result = await migrateBookPhotos(
+            { entries: current.entries, room: current.settings.room },
+            async (dataUrl) => {
+              const ref = await savePhotoDataUrl(dataUrl);
+              replacements.set(dataUrl, ref);
+              return ref;
+            },
+          );
+          set((state) => {
+            if (replacements.size === 0) {
+              return result.failedCount === 0 ? { settings: { ...state.settings, photosMigrated: true } } : state;
+            }
+            const mapUri = (uri: string) => replacements.get(uri) ?? uri;
+            const entries = state.entries.map((entry) => {
+              const hasMatch =
+                entry.photos.some((uri) => replacements.has(uri)) ||
+                Boolean(entry.photoPlacements?.some((photo) => replacements.has(photo.uri)));
+              if (!hasMatch) return entry;
+              return {
+                ...entry,
+                photos: entry.photos.map(mapUri),
+                ...(entry.photoPlacements
+                  ? {
+                      photoPlacements: entry.photoPlacements.map((photo) => ({
+                        ...photo,
+                        uri: mapUri(photo.uri),
+                      })),
+                    }
+                  : {}),
+              };
+            });
+            const room = {
+              ...state.settings.room,
+              items: state.settings.room.items.map((item) =>
+                item.photo && replacements.has(item.photo) ? { ...item, photo: mapUri(item.photo) } : item,
+              ),
+            };
+            return {
+              entries,
+              settings: {
+                ...state.settings,
+                room,
+                photosMigrated: result.failedCount === 0,
+              },
+            };
+          });
+        })().finally(() => {
+          inflightPhotoMigration = null;
+        });
+        return inflightPhotoMigration;
+      },
       snapshot: () => {
         const { settings, entries, wallet } = get();
         return { version: 2, exportedAt: new Date().toISOString(), settings, entries, wallet, books: settings.books };

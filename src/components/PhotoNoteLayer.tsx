@@ -4,6 +4,7 @@ import { Image, PanResponder, Pressable, StyleSheet, Text, TextInput, View } fro
 import { holdDecoration } from '../logic/pageGesture';
 import { pointerAngle, rotationFromDrag } from '../logic/stickerPlacement';
 import type { NotePlacement, NoteStyle, PhotoFrame, PhotoPlacement } from '../models/types';
+import { usePhotoUri } from '../services/photoStorage';
 import { useTheme } from '../theme/BookTheme';
 import { fontById } from '../theme/fonts';
 
@@ -229,7 +230,7 @@ export function PhotoNoteLayer({
           >
             <View style={[frameStyle(photo.frame), { width: '100%' }]}>
               {photo.frame === 'tape' ? <View style={styles.tape} /> : null}
-              <Image source={{ uri: photo.uri }} style={{ width: '100%', aspectRatio: 1, borderRadius: photo.frame === 'round' ? 16 : 0 }} />
+              <ResolvedPlacedPhoto uri={photo.uri} round={photo.frame === 'round'} />
             </View>
           </PlacedBox>
         );
@@ -284,3 +285,9 @@ const styles = StyleSheet.create({
   turn: { position: 'absolute', left: -6, bottom: -6, width: 18, height: 18, borderRadius: 9, backgroundColor: '#7AA2E3', borderWidth: 2, borderColor: '#fff' },
   tape: { position: 'absolute', top: -8, alignSelf: 'center', width: 36, height: 12, backgroundColor: 'rgba(255, 214, 160, 0.85)', transform: [{ rotate: '-4deg' }] },
 });
+
+function ResolvedPlacedPhoto({ uri, round }: { uri: string; round: boolean }) {
+  const resolved = usePhotoUri(uri);
+  if (!resolved) return <View style={{ width: "100%", aspectRatio: 1, borderRadius: round ? 16 : 0 }} />;
+  return <Image source={{ uri: resolved }} style={{ width: "100%", aspectRatio: 1, borderRadius: round ? 16 : 0 }} />;
+}

@@ -36,7 +36,9 @@ export default function RootLayout() {
   const hydrated = useHydrated();
   const encryptAtRest = useDiary((state) => state.settings.encryptAtRest);
   useEffect(() => {
-    if (hydrated) setVaultEncryption(encryptAtRest);
+    if (!hydrated) return;
+    setVaultEncryption(encryptAtRest);
+    void useDiary.getState().migratePhotos();
   }, [hydrated, encryptAtRest]);
   const [loaded, error] = useFonts({
     Nunito_400Regular,

@@ -4,7 +4,8 @@ import { Image, Text, View } from 'react-native';
 import { promptForDate } from '../data/prompts';
 import { useDiary } from '../store/useDiary';
 import { formatLong } from '../logic/dates';
-import type { DiaryBook, DiaryEntry } from '../models/types';
+import type { DiaryBook, DiaryEntry, PhotoPlacement } from '../models/types';
+import { usePhotoUri } from '../services/photoStorage';
 import { getMood } from '../data/moods';
 import { StickerView } from '../stickers/StickerView';
 import { ThemeOverride, useTheme } from '../theme/BookTheme';
@@ -32,7 +33,7 @@ export const NeighborPage = memo(function NeighborPage({ entry, book, premium }:
             )}
           </View>
           {(entry.photoPlacements ?? []).map((photo) => (
-            <Image key={photo.id} source={{ uri: photo.uri }} style={{ position: 'absolute', left: photo.x * box.w - 48, top: photo.y * box.h - 40, width: 96 * photo.scale, height: 78 * photo.scale, borderRadius: photo.frame === 'round' ? 16 : 4, transform: [{ rotate: `${photo.rotation}deg` }] }} />
+            <NeighborPhoto key={photo.id} photo={photo} box={box} />
           ))}
           {(entry.notes ?? []).map((note) => {
             const font = fontById(note.fontId);
@@ -76,5 +77,24 @@ export function EndPaper({ edge }: { edge: 'start' | 'end' }) {
         </Text>
       </View>
     </Paper>
+  );
+}
+
+function NeighborPhoto({ photo, box }: { photo: PhotoPlacement; box: { w: number; h: number } }) {
+  const resolved = usePhotoUri(photo.uri);
+  if (!resolved) return null;
+  return (
+    <Image
+      source={{ uri: resolved }}
+      style={{
+        position: "absolute",
+        left: photo.x * box.w - 48,
+        top: photo.y * box.h - 40,
+        width: 96 * photo.scale,
+        height: 78 * photo.scale,
+        borderRadius: photo.frame === "round" ? 16 : 4,
+        transform: [{ rotate: `${photo.rotation}deg` }],
+      }}
+    />
   );
 }

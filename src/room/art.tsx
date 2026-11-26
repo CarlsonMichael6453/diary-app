@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import Svg, { Circle, ClipPath, Defs, Ellipse, G, Image as SvgImage, Path, Rect } from 'react-native-svg';
 
 import { strokesFrom } from '../logic/drawing';
+import { usePhotoUri } from '../services/photoStorage';
 import { isFrame, type RoomTheme } from './catalog';
 import { fitDrawing } from './fitDrawing';
 import { Plushie } from './plush';
@@ -25,6 +26,7 @@ function EaselPicture({ drawing, width }: { drawing?: string | null; width: numb
 }
 
 function FramePicture({ kind, photo, width }: { kind: string; photo?: string | null; width: number }) {
+  const resolvedPhoto = usePhotoUri(photo);
   const clip = `frame${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   const height = Math.round(width * 0.88);
   const pastel = kind === 'frame-pastel';
@@ -42,9 +44,9 @@ function FramePicture({ kind, photo, width }: { kind: string; photo?: string | n
       </Defs>
       <Rect x={4} y={4} width={92} height={80} rx={pastel ? 12 : 3} fill={mat} stroke={border} strokeWidth={gold ? 7 : polaroid ? 1.5 : 6} />
       {gold ? <Rect x={12} y={10} width={76} height={64} fill="none" stroke="#FFF6D8" strokeWidth={2} /> : null}
-      {photo ? (
+      {resolvedPhoto ? (
         <G clipPath={`url(#${clip})`}>
-          <SvgImage href={photo} x={opening.x} y={opening.y} width={opening.w} height={opening.h} preserveAspectRatio="xMidYMid slice" />
+          <SvgImage href={resolvedPhoto} x={opening.x} y={opening.y} width={opening.w} height={opening.h} preserveAspectRatio="xMidYMid slice" />
         </G>
       ) : (
         <G>

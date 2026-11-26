@@ -129,6 +129,8 @@ export type Settings = {
   /** Show a writing question at the top of each page. */
   writingPrompts: boolean;
   room: import('../room/edit').PalRoom;
+  /** True once inline base64 photos have been migrated out of the persisted store. */
+  photosMigrated?: boolean;
 };
 
 export type Wallet = {

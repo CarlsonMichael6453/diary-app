@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 
 import { pickDiaryPhoto } from './photos';
+import { savePhotoBlob } from './photoStorage';
 
 /** A picture for the room frame. It stays on this device. */
 export function pickRoomPhoto(): Promise<string | null> {
@@ -15,9 +16,7 @@ export function pickRoomPhoto(): Promise<string | null> {
           resolve(null);
           return;
         }
-        const reader = new FileReader();
-        reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : null);
-        reader.readAsDataURL(file);
+        void savePhotoBlob(file).then(resolve).catch(() => resolve(null));
       };
       input.click();
     });

@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { useState } from 'react';
 import { Linking, Pressable, Text, TextInput, View } from 'react-native';
 
@@ -51,9 +50,6 @@ export default function FeedbackScreen() {
 
   return (
     <Screen>
-      <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Back">
-        <Text style={{ color: theme.colors.ink, fontFamily: theme.body, fontSize: 16 }}>Back</Text>
-      </Pressable>
       <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 36, marginTop: 8 }}>Send feedback</Text>
       <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, marginTop: 4 }}>
         A rating, a note, and an optional email if you want a reply. Your diary entries are never included.

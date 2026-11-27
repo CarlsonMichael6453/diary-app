@@ -9,7 +9,6 @@ export default function PrivacyScreen() {
   const theme = useTheme();
   return (
     <Screen>
-      <Button label="Back" tone="ghost" onPress={() => router.back()} />
       <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 36, marginTop: 8 }}>Privacy</Text>
       <Text style={{ color: theme.colors.ink, fontFamily: theme.body, fontSize: 16, lineHeight: 24, marginTop: 12 }}>
         There is no AI in Diary App, on the website, or in the feedback form. Pages, photos, voice notes, drawings, moods, and tags stay on this device. They are not uploaded.

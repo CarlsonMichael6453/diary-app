@@ -63,7 +63,6 @@ export default function SpinScreen() {
 
   return (
     <Screen>
-      <Pressable onPress={() => router.back()}><Text style={{ color: theme.colors.ink, fontFamily: theme.body }}>Back</Text></Pressable>
       <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 36, marginTop: 8 }}>Daily spin</Text>
       <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>{used ? 'The wheel rests until tomorrow.' : 'One spin. The pointer is the gold triangle.'}</Text>
       <View style={{ alignItems: 'center', marginTop: 18 }}>

@@ -47,6 +47,9 @@ import { resolveEntryLook, type ColorDesign } from '@/src/theme/designs';
 import { applyType, FONT_CHOICES, INK_SWATCHES, sanitizeInk } from '@/src/theme/fonts';
 import { THEMES, getTheme, type ThemeId } from '@/src/theme/themes';
 
+// The page itself shows where you are typing. A browser focus box around the
+// lines looks like a form field, so the writing inputs drop it on the web.
+const pageInputWeb = (Platform.OS === 'web' ? { outlineStyle: 'none', outlineWidth: 0 } : {}) as object;
 const webScroll = (Platform.OS === 'web' ? { touchAction: 'manipulation', overscrollBehaviorY: 'contain', WebkitOverflowScrolling: 'touch' } : {}) as ViewStyle;
 
 type Draft = {
@@ -533,6 +536,9 @@ function updateSticker(next: StickerPlacement) {
   const selectedPhoto = draft.photoPlacements.find((item) => item.id === selectedId) ?? null;
   const selectedNote = draft.notes.find((item) => item.id === selectedId) ?? null;
   const selectedLayer = selectedId;
+  // A short page ends where the bottom-right pal and its speech bubble sit.
+  // Keep the page buttons on the left so the bubble never covers one.
+  const palBesideButtons = Boolean(buddy) && !deep && perch === 'br';
   const padding = {
     paddingTop: perch === 'tr' || perch === 'banner' ? 108 : 18,
     paddingBottom: perch === 'br' || perch === 'bl' ? 130 : 24,
@@ -632,7 +638,7 @@ function updateSticker(next: StickerPlacement) {
                   placeholder="Title"
                   placeholderTextColor={theme.colors.paperSoft}
                   editable={!decorate}
-                  style={{ color: theme.colors.paperInk, fontFamily: theme.script, fontSize: 34, marginTop: 8 }}
+                  style={[{ color: theme.colors.paperInk, fontFamily: theme.script, fontSize: 34, marginTop: 8 }, pageInputWeb]}
                 />
                 <TextInput
                   value={draft.body}
@@ -643,11 +649,11 @@ function updateSticker(next: StickerPlacement) {
                   placeholderTextColor={theme.colors.paperSoft}
                   multiline
                   editable={!decorate}
-                  style={{ color: theme.colors.paperInk, fontFamily: theme.body, fontSize: 17, lineHeight: 28, minHeight: 220 + ruled, textAlignVertical: 'top' }}
+                  style={[{ color: theme.colors.paperInk, fontFamily: theme.body, fontSize: 17, lineHeight: 28, minHeight: 220 + ruled, textAlignVertical: 'top' }, pageInputWeb]}
                 />
               </View>
             )}
-            <View ref={markSection} {...sectionTouch} pointerEvents="auto" style={{ zIndex: 46, flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingLeft: padding.paddingLeft, paddingRight: padding.paddingRight, paddingBottom: 16 }}>
+            <View ref={markSection} {...sectionTouch} pointerEvents="auto" style={{ zIndex: 46, flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingLeft: padding.paddingLeft, paddingRight: palBesideButtons ? 200 : padding.paddingRight, paddingBottom: 16 }}>
               <Pressable accessibilityLabel="Extend page" onPress={() => setDraft({ ...draft, extraLines: (draft.extraLines ?? 0) + 8 })} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: theme.colors.chip }}>
                 <Text style={{ color: theme.colors.chipInk, fontFamily: theme.body }}>Extend page</Text>
               </Pressable>

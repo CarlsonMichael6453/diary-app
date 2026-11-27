@@ -24,7 +24,6 @@ export default function StickerStoreScreen() {
 
   return (
     <Screen>
-      <Button label="Back" tone="ghost" onPress={() => router.back()} />
       <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 36, marginTop: 8 }}>Sticker packs</Text>
       <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>Coins or Diary Plus. Nothing is charged. Seasonal packs return every year, and owned stickers stay.</Text>
       <Text style={{ color: theme.colors.ink, fontFamily: theme.body, marginTop: 8 }}>{wallet.coins} coins{settings.debugDate ? ` · shop date ${today}` : ''}</Text>

@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { Text, View } from 'react-native';
 
 import { getBuddy } from '@/src/buddies/catalog';
@@ -33,7 +32,6 @@ export default function WidgetPreviewScreen() {
   });
   return (
     <Screen>
-      <Button label="Back" tone="ghost" onPress={() => router.back()} />
       <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 36, marginTop: 8 }}>Widgets</Text>
       <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body, marginTop: 8 }}>{WIDGET_BUILD_NOTE}</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 16 }}>

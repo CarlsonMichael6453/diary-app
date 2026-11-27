@@ -95,7 +95,7 @@ export default function MemoryScreen() {
   return (
     <Screen scroll={false} style={{ flex: 1, paddingHorizontal: 16 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Pressable onPress={() => router.back()}><Text style={{ color: theme.colors.ink, fontFamily: theme.body }}>Back</Text></Pressable>
+        <View />
         <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 28 }}>Memory</Text>
         <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>{status}</Text>
       </View>

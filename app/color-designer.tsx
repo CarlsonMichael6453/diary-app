@@ -83,7 +83,6 @@ export default function ColorDesignerScreen() {
 
   return (
     <Screen>
-      <Button label="Back" tone="ghost" onPress={() => router.back()} />
       <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 36, marginTop: 8 }}>Color designer</Text>
       <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>
         Patterns are free. Moving designs and metallic shine are Diary Plus. Nothing leaves this device.

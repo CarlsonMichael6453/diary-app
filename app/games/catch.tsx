@@ -90,7 +90,7 @@ export default function CatchScreen() {
   return (
     <Screen scroll={false} style={{ flex: 1, paddingHorizontal: 16 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        <Pressable onPress={() => router.back()}><Text style={{ color: theme.colors.ink, fontFamily: theme.body }}>Back</Text></Pressable>
+        <View />
         <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 28 }}>Catch</Text>
         <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>{time}s · {score}</Text>
       </View>

@@ -277,7 +277,7 @@ export function LockOverlay() {
           </Text>
           <Text style={{ color: theme.colors.ink, fontFamily: theme.body, textAlign: 'center' }}>{Platform.OS === 'web' ? 'Wiggle to open' : 'Shake to open'}</Text>
           <Pressable onPress={openBook} accessibilityRole="button" accessibilityLabel="Tap to open">
-            <Text style={{ color: theme.colors.accent, fontFamily: theme.body, fontSize: 18 }}>Tap to open</Text>
+            <Text style={{ color: theme.colors.chipInk, fontFamily: theme.body, fontSize: 18, textDecorationLine: 'underline' }}>Tap to open</Text>
           </Pressable>
         </View>
       ) : (

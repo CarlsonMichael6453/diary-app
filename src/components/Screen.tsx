@@ -66,7 +66,7 @@ function NavRow() {
         <Text style={{ color: theme.colors.ink, fontFamily: theme.body, fontSize: 16 }}>‹ Back</Text>
       </Pressable>
       <Pressable accessibilityRole="button" accessibilityLabel="Home" onPress={() => router.navigate('/')}>
-        <Text style={{ color: home ? theme.colors.accent : theme.colors.ink, fontFamily: theme.body, fontSize: 16 }}>Home</Text>
+        <Text style={{ color: home ? theme.colors.chipInk : theme.colors.ink, fontFamily: theme.body, fontSize: 16 }}>Home</Text>
       </Pressable>
     </View>
   );

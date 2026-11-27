@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { Text, View } from 'react-native';
 
 import { Screen } from '@/src/components/Screen';
@@ -26,7 +25,6 @@ export default function StatsScreen() {
 
   return (
     <Screen>
-      <Button label="Back" tone="ghost" onPress={() => router.back()} />
       <Text style={{ color: theme.colors.ink, fontFamily: theme.display, fontSize: 36, marginTop: 8 }}>Mood stats</Text>
       <Text style={{ color: theme.colors.inkSoft, fontFamily: theme.body }}>Year in pixels for {settings.books.find((book) => book.id === settings.activeBookId)?.title ?? 'this book'}. Nothing leaves the device.</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 3, marginTop: 16 }}>

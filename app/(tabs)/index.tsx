@@ -80,7 +80,7 @@ export default function DiaryHome() {
             accessibilityLabel="Send feedback"
             style={{ alignSelf: 'flex-start', marginTop: 2 }}
           >
-            <Text style={{ color: theme.colors.accent, fontFamily: theme.body, fontSize: 15 }}>Send feedback</Text>
+            <Text style={{ color: theme.colors.chipInk, fontFamily: theme.body, fontSize: 15, textDecorationLine: 'underline' }}>Send feedback</Text>
           </Pressable>
         </View>
         <CoinPill coins={coins} />

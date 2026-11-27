@@ -27,4 +27,12 @@ describe('book styles', () => {
     assert.equal(getTheme('missing').id, 'cutesy');
     assert.equal(getTheme('aurora').name, 'Aurora');
   });
+
+  it('gives every theme a chipInk color', () => {
+    assert.ok(THEMES.length > 0);
+    for (const theme of THEMES) {
+      assert.equal(typeof theme.colors.chipInk, 'string', theme.id);
+      assert.match(theme.colors.chipInk, /^#[0-9A-Fa-f]{6}$/, theme.id);
+    }
+  });
 });
